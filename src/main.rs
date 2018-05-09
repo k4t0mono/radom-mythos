@@ -31,21 +31,45 @@ impl<'a> fmt::Display for Relation<'a> {
     }
 }
 
-struct Relations<'a>(&'a mut Vec<Relation<'a>>);
+struct Relations<'a>{
+    relations: &'a mut Vec<Relation<'a>>,
+    entites: &'a Vec<Entity>,
+}
 
 impl<'a> Relations<'a> {
     fn add(&mut self, type_: RelationType, source: &'a Entity, destiny: &'a Entity) {
-        self.0.push(Relation{ type_, source, destiny });
+        self.relations.push(Relation{ type_, source, destiny });
     }
 
-    fn generate_child_parent(&mut self, entites: &'a mut Vec<Entity>) {
-        let s = entites.len();
-        let n = rand::thread_rng().gen_range(3, s/2+3);
+    fn generte_dot(&mut self) -> String {
+        let mut s: String = "digraph G {\n".to_string();
+
+        for e in self.entites.iter() {
+            s += &format!("\t{}\n", e.name);
+        }
+        
+        s += "\n";
+        for &Relation{ ref type_, ref source, ref destiny } in self.relations.iter() {
+            match type_ {
+                &RelationType::Parent => s += &format!("\t{} -> {}\n", source.name, destiny.name),
+                _ => trace!("Noting for you uwu"),
+            }
+        }
+
+        s += "}";
+        s
+    }
+
+    fn generate_child_parent(&mut self) {
+        let s = self.entites.len();
+        trace!("s: {}", s);
+        // let n = rand::thread_rng().gen_range(3, s/2+3);
+        let n = 4*s/4 as usize;
         info!("{} relations child parent", n);
         
         for _i in 0..n {
-            let parent = &entites[rand::thread_rng().gen_range(0, s)];
-            let child = &entites[rand::thread_rng().gen_range(0, s)];
+            let parent = &self.entites[rand::thread_rng().gen_range(0, s)];
+            let child = &self.entites[rand::thread_rng().gen_range(0, s)];
 
             info!("parent: {:?}, child: {:?}", parent.name, child.name);
             self.add(RelationType::Child, child, parent);
@@ -57,7 +81,7 @@ impl<'a> Relations<'a> {
 fn set_logger() {
     use simplelog::*;
     
-    TermLogger::init(LevelFilter::Info, Config::default()).unwrap();
+    TermLogger::init(LevelFilter::Trace, Config::default()).unwrap();
 }
 
 fn main() {
@@ -66,18 +90,19 @@ fn main() {
     info!("Random Mythos engage");
 
     let mut entites: Vec<Entity> = vec![];
-    for i in 0..20 {
+    for i in 0..42 {
         entites.push(Entity{ name: format!("ent{}", i) });
     }
     
     let mut rel: Vec<Relation> = vec![];
-    let mut relations = Relations(&mut rel);
+    let mut relations = Relations{ relations: &mut rel, entites: &entites };
     
-    relations.generate_child_parent(&mut entites);
+    relations.generate_child_parent();
 
     //relations.add(RelationType::Parent, &entites[0], &entites[1]);
     //relations.add(RelationType::Child, &entites[1], &entites[0]);
 
     //for i in entites.iter() { println!("{:?}", i); }
-    for i in relations.0.iter() { println!("{}", i); }
+    for i in relations.entites.iter() { println!("{:?}", i); }
+    println!("{}", relations.generte_dot());
 }
