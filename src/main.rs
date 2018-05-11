@@ -4,19 +4,53 @@ extern crate log;
 extern crate simplelog;
 extern crate rand;
 
+use std::fs::OpenOptions;
+use std::io::prelude::*;
 use rand::Rng;
 use std::fmt;
 
-#[derive(Debug)]
+
+fn write_file<'a>(name: &'a str, path: &'a str) {
+    let f = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .open(path);
+
+    let mut file = match f {
+        Err(e) => {
+            error!("Something is terrible wrong happend while oppening the file");
+            error!("{}", e);
+
+            panic!(e)
+        },
+
+        Ok(fl) => fl,
+    };
+    
+    match file.write_all(name.as_bytes()) {
+        Err(e) => {
+            error!("Something is terrible wrong happend while writing the file");
+            error!("{}", e);
+
+            panic!(e)
+        },
+
+        Ok(_) => info!("File writed sucessfully"),
+    }
+}
+
+
+#[derive(Debug, PartialEq, Eq)]
 struct Entity {
     name: String,
 }
 
-#[derive(Debug)]
+
+#[derive(Debug, PartialEq, Eq)]
 enum RelationType {
     Parent,
-    Child,
 }
+
 
 #[derive(Debug)]
 struct Relation<'a> {
@@ -25,23 +59,26 @@ struct Relation<'a> {
     destiny: &'a Entity,
 }
 
+
 impl<'a> fmt::Display for Relation<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{} is {:?} of {}", self.source.name, self.type_, self.destiny.name)
     }
 }
 
+
 struct Relations<'a>{
     relations: &'a mut Vec<Relation<'a>>,
     entites: &'a Vec<Entity>,
 }
+
 
 impl<'a> Relations<'a> {
     fn add(&mut self, type_: RelationType, source: &'a Entity, destiny: &'a Entity) {
         self.relations.push(Relation{ type_, source, destiny });
     }
 
-    fn generte_dot(&mut self) -> String {
+    fn generte_dot(&mut self) {
         let mut s: String = "digraph G {\n".to_string();
 
         for e in self.entites.iter() {
@@ -52,31 +89,59 @@ impl<'a> Relations<'a> {
         for &Relation{ ref type_, ref source, ref destiny } in self.relations.iter() {
             match type_ {
                 &RelationType::Parent => s += &format!("\t{} -> {}\n", source.name, destiny.name),
-                _ => trace!("Noting for you uwu"),
             }
         }
 
         s += "}";
-        s
+        let s_slice: &str = &*s;
+        write_file(&s_slice, "relations.dot");
+    }
+
+    fn exists(&mut self, i_src: usize, i_dest: usize, rt: RelationType) -> bool {
+        let src = &self.entites[i_src];
+        let dest = &self.entites[i_dest];
+
+        for &Relation{ ref type_, ref source, ref destiny } in self.relations.iter() {
+            if *type_ == rt && *source == src && *destiny == dest {
+                return true   
+            }
+        }
+
+        false
     }
 
     fn generate_child_parent(&mut self) {
         let s = self.entites.len();
-        trace!("s: {}", s);
         // let n = rand::thread_rng().gen_range(3, s/2+3);
         let n = 4*s/4 as usize;
         info!("{} relations child parent", n);
         
         for _i in 0..n {
-            let parent = &self.entites[rand::thread_rng().gen_range(0, s)];
-            let child = &self.entites[rand::thread_rng().gen_range(0, s)];
+            let mut i_parent = rand::thread_rng().gen_range(0, s);
+            let mut i_child = rand::thread_rng().gen_range(0, s);
+            trace!("parent: {:?}, child: {:?}", i_parent, i_child);
+            
+            while i_parent == i_child  {
+                trace!("I can't be my own parent");
+                i_child = rand::thread_rng().gen_range(0, s);
+                trace!("New child: {}", i_child);
+            }
+
+            let parent = &self.entites[i_parent];
+            let child = &self.entites[i_child];
+            
+            while self.exists(i_parent, i_child, RelationType::Parent) {
+                trace!("You already are the parent");
+                i_parent = rand::thread_rng().gen_range(0, s);
+                trace!("New parent: {}", i_parent);
+            }
 
             info!("parent: {:?}, child: {:?}", parent.name, child.name);
-            self.add(RelationType::Child, child, parent);
             self.add(RelationType::Parent, parent, child);
         }
     }
 }
+
 
 fn set_logger() {
     use simplelog::*;
@@ -84,14 +149,15 @@ fn set_logger() {
     TermLogger::init(LevelFilter::Trace, Config::default()).unwrap();
 }
 
+
 fn main() {
     set_logger();
 
     info!("Random Mythos engage");
 
     let mut entites: Vec<Entity> = vec![];
-    for i in 0..42 {
-        entites.push(Entity{ name: format!("ent{}", i) });
+    for i in 0..10 {
+        entites.push(Entity{ name: format!("ent{:02}", i) });
     }
     
     let mut rel: Vec<Relation> = vec![];
@@ -99,10 +165,5 @@ fn main() {
     
     relations.generate_child_parent();
 
-    //relations.add(RelationType::Parent, &entites[0], &entites[1]);
-    //relations.add(RelationType::Child, &entites[1], &entites[0]);
-
-    //for i in entites.iter() { println!("{:?}", i); }
-    for i in relations.entites.iter() { println!("{:?}", i); }
-    println!("{}", relations.generte_dot());
+    relations.generte_dot();
 }
