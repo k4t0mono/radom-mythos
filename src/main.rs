@@ -9,7 +9,7 @@ use std::io::prelude::*;
 use rand::Rng;
 use std::fmt;
 
-
+#[allow(dead_code)]
 fn write_file<'a>(name: &'a str, path: &'a str) {
     let f = OpenOptions::new()
             .write(true)
@@ -46,76 +46,57 @@ struct Entity {
 }
 
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 enum RelationType {
     Parent,
+    Other,
 }
 
 
-#[derive(Debug)]
-struct Relation<'a> {
-    type_: RelationType,
-    source: &'a Entity,
-    destiny: &'a Entity,
+struct Relations<'a> {
+    entites: &'a Vec<Entity>,
+    relations: Vec<Vec<Option<RelationType>>>,
 }
 
-
-impl<'a> fmt::Display for Relation<'a> {
+impl<'a> fmt::Debug for Relations<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{} is {:?} of {}", self.source.name, self.type_, self.destiny.name)
+        let mut s: String = "".to_string();
+
+        for i in self.relations.iter() {
+            for j in i.iter() {
+                match j {
+                    &None => s += "---",
+                    &Some(ref v) => s += &format!("{:?}", v),
+                }
+                s += "\t";
+            }
+            s += "\n";
+        }
+
+        write!(f, "{}", s)
     }
 }
-
-
-struct Relations<'a>{
-    relations: &'a mut Vec<Relation<'a>>,
-    entites: &'a Vec<Entity>,
-}
-
 
 impl<'a> Relations<'a> {
-    fn add(&mut self, type_: RelationType, source: &'a Entity, destiny: &'a Entity) {
-        self.relations.push(Relation{ type_, source, destiny });
+    pub fn init(e: &'a Vec<Entity>) -> Relations<'a> {
+        let s = e.len();
+        let r: Vec<Vec<Option<RelationType>>> = vec![vec![None; s]; s];
+
+        Relations{ entites: e, relations: r }
     }
 
-    fn generte_dot(&mut self) {
-        let mut s: String = "digraph G {\n".to_string();
-
-        for e in self.entites.iter() {
-            s += &format!("\t{}\n", e.name);
-        }
-        
-        s += "\n";
-        for &Relation{ ref type_, ref source, ref destiny } in self.relations.iter() {
-            match type_ {
-                &RelationType::Parent => s += &format!("\t{} -> {}\n", source.name, destiny.name),
-            }
-        }
-
-        s += "}";
-        let s_slice: &str = &*s;
-        write_file(&s_slice, "relations.dot");
+    fn add(&mut self, source: usize, destiny: usize, rt : RelationType) {
+        self.relations[source][destiny] = Some(rt);
     }
 
-    fn exists(&mut self, i_src: usize, i_dest: usize, rt: RelationType) -> bool {
-        let src = &self.entites[i_src];
-        let dest = &self.entites[i_dest];
-
-        for &Relation{ ref type_, ref source, ref destiny } in self.relations.iter() {
-            if *type_ == rt && *source == src && *destiny == dest {
-                return true   
-            }
-        }
-
-        false
-    }
 
     fn generate_child_parent(&mut self) {
         let s = self.entites.len();
-        // let n = rand::thread_rng().gen_range(3, s/2+3);
-        let n = 4*s/4 as usize;
-        info!("{} relations child parent", n);
-        
+        trace!("self.entites: {}", s);
+
+        let n = s as usize;
+        trace!("num relations: {}", n);
+
         for _i in 0..n {
             let mut i_parent = rand::thread_rng().gen_range(0, s);
             let mut i_child = rand::thread_rng().gen_range(0, s);
@@ -126,19 +107,39 @@ impl<'a> Relations<'a> {
                 i_child = rand::thread_rng().gen_range(0, s);
                 trace!("New child: {}", i_child);
             }
-
-            let parent = &self.entites[i_parent];
-            let child = &self.entites[i_child];
             
-            while self.exists(i_parent, i_child, RelationType::Parent) {
+            while let &Some(ref _rt) = &self.relations[i_parent][i_child] {
                 trace!("You already are the parent");
                 i_parent = rand::thread_rng().gen_range(0, s);
                 trace!("New parent: {}", i_parent);
             }
 
-            info!("parent: {:?}, child: {:?}", parent.name, child.name);
-            self.add(RelationType::Parent, parent, child);
+            info!("parent: {:?}, child: {:?}", i_parent, i_child);
+            self.relations[i_parent][i_child] = Some(RelationType::Parent);
         }
+    }
+
+    fn generate_dot(&mut self) {
+        let mut s: String = "digraph G {\n".to_string();
+
+        for e in self.entites.iter() {
+            s += &format!("\t{}\n", e.name);
+        }
+        
+        s += "\n";
+        let n = self.entites.len();
+        for i in 0..n {
+            for j in 0..n {
+                match &self.relations[i][j] {
+                    &Some(RelationType::Parent) => s += &format!("\t {} -> {}\n", self.entites[i].name, self.entites[j].name),
+                    _ => s += "",
+                };
+            }
+        }
+
+        s += "}";
+        let s_slice: &str = &*s;
+        write_file(&s_slice, "relations.dot");
     }
 }
 
@@ -159,11 +160,11 @@ fn main() {
     for i in 0..10 {
         entites.push(Entity{ name: format!("ent{:02}", i) });
     }
-    
-    let mut rel: Vec<Relation> = vec![];
-    let mut relations = Relations{ relations: &mut rel, entites: &entites };
+
+    let mut relations = Relations::init(&entites);
+    relations.add(0, 0, RelationType::Other);
     
     relations.generate_child_parent();
-
-    relations.generte_dot();
+    println!("{:?}", relations);
+    relations.generate_dot();
 }
