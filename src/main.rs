@@ -35,7 +35,7 @@ fn write_file<'a>(name: &'a str, path: &'a str) {
             panic!(e)
         },
 
-        Ok(_) => info!("File writed sucessfully"),
+        Ok(_) => info!("File {} writed sucessfully", path),
     }
 }
 
@@ -45,7 +45,7 @@ struct Entity {
     name: String,
 }
 
-
+#[allow(dead_code)]
 #[derive(Debug, PartialEq, Eq, Clone)]
 enum RelationType {
     Parent,
@@ -85,10 +85,23 @@ impl<'a> Relations<'a> {
         Relations{ entites: e, relations: r }
     }
 
+    #[allow(dead_code)]
     fn add(&mut self, source: usize, destiny: usize, rt : RelationType) {
         self.relations[source][destiny] = Some(rt);
     }
 
+    fn adjacent_out(&mut self, vertex: usize) -> Vec<usize> {
+        let mut v: Vec<usize> = vec![];
+        
+        for j in 0..self.relations[vertex].len() {
+            match &self.relations[vertex][j] {
+                &Some(_) => v.push(j),
+                &None => (),
+            }
+        }
+
+        v
+    }
 
     fn generate_child_parent(&mut self) {
         let s = self.entites.len();
@@ -114,12 +127,36 @@ impl<'a> Relations<'a> {
                 trace!("New parent: {}", i_parent);
             }
 
+            let mut stack: Vec<usize> = vec![];
+            let mut verif = vec![false; n];
+            stack.push(i_child);
+            trace!("Verificando ciclos");
+            while let Some(top) = stack.pop() {
+                trace!("v: {}", top);
+
+                if verif[top] || top == i_parent {
+                    trace!("A cicle identifyed");
+
+                    stack.clear();
+                    verif = vec![false; n];
+                    i_child = rand::thread_rng().gen_range(0, s);
+                    stack.push(i_child);
+
+                    trace!("New child: {}",i_child);
+
+                } else {
+                    verif[top] = true;
+                    let adj = self.adjacent_out(top);
+                    for i in adj.iter() { stack.push(*i); }
+                }
+            }
+
             info!("parent: {:?}, child: {:?}", i_parent, i_child);
             self.relations[i_parent][i_child] = Some(RelationType::Parent);
         }
     }
 
-    fn generate_dot(&mut self) {
+    fn generate_dot(&mut self, name: Option<String>) {
         let mut s: String = "digraph G {\n".to_string();
 
         for e in self.entites.iter() {
@@ -139,7 +176,15 @@ impl<'a> Relations<'a> {
 
         s += "}";
         let s_slice: &str = &*s;
-        write_file(&s_slice, "relations.dot");
+        
+        let fl: String;
+        match name {
+            None => fl = "relations.dot".to_string(),
+            Some(n) => fl = n + ".dot",
+        }
+        let fl_slice: &str = &*fl;
+        
+        write_file(&s_slice, &fl_slice);
     }
 }
 
@@ -162,9 +207,8 @@ fn main() {
     }
 
     let mut relations = Relations::init(&entites);
-    relations.add(0, 0, RelationType::Other);
     
     relations.generate_child_parent();
     println!("{:?}", relations);
-    relations.generate_dot();
+    relations.generate_dot(None);
 }
