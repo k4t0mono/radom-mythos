@@ -43,7 +43,19 @@ fn write_file<'a>(name: &'a str, path: &'a str) {
 #[derive(Debug, PartialEq, Eq)]
 struct Entity {
 	name: String,
+	level: i8,
 }
+
+impl Entity {
+	fn to_dot(&self) -> String {
+		format!(
+			"{0} [label=\"{{ {0} | {1} }}\"]",
+			self.name,
+			self.level,
+		)
+	}
+}
+
 
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -81,7 +93,10 @@ impl Relations {
 	pub fn init(size: usize) -> Relations {
 		let mut entites: Vec<Entity> = vec![];
 		for i in 0..size {
-			entites.push(Entity{ name: format!("ent{:02}", i) });
+			entites.push(Entity{
+				name: format!("ent{:02}", i),
+				level: 0,
+			});
 		}
 
 		let relations: Vec<Vec<Option<RelationType>>> = vec![vec![None; size]; size];
@@ -160,34 +175,39 @@ impl Relations {
 	}
 
 	fn generate_dot(&mut self, name: Option<String>) {
+		let get_color = |rt: &RelationType| -> &str {
+			match rt {
+				&RelationType::Base => "#909090",
+				&RelationType::Parent => "#000000",
+			}
+		};
+
+		let relation_to_dot = |i: usize, j: usize, rt: &RelationType| -> String {
+			format!(
+				"{} -> {} [color=\"{}\"]",
+				self.entites[i].name,
+				self.entites[j].name,
+				get_color(rt),
+			)
+		};
+
 		let mut s: String = "digraph G {\n".to_string();
 
+		s += "\tnode [shape=record style=rounded]\n\n";
+
 		for e in self.entites.iter() {
-			s += &format!("\t{}\n", e.name);
+			s += &format!("\t{}\n", e.to_dot());
 		}
 
 		s += "\n";
+
 		let n = self.entites.len();
 		for i in 0..n {
 			for j in 0..n {
 				match &self.relations[i][j] {
-					&Some(RelationType::Parent) => {
-						s += &format!(
-							"\t {} -> {}\n",
-							self.entites[i].name,
-							self.entites[j].name
-						)
-					},
-
-					&Some(RelationType::Base) => {
-						s += &format!(
-							"\t {} -> {} [color=\"grey41\"]\n",
-							self.entites[i].name,
-							self.entites[j].name
-						)
-					},
-					_ => s += "",
-				};
+					&Some(ref rt) => s += &format!("\t{}\n", relation_to_dot(i, j, rt)),
+					&None => (),
+				}
 			}
 		}
 
