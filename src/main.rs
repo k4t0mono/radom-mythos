@@ -53,12 +53,12 @@ enum RelationType {
 }
 
 
-struct Relations<'a> {
-    entites: &'a Vec<Entity>,
+struct Relations {
+    entites: Vec<Entity>,
     relations: Vec<Vec<Option<RelationType>>>,
 }
 
-impl<'a> fmt::Debug for Relations<'a> {
+impl fmt::Debug for Relations {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut s: String = "".to_string();
 
@@ -77,12 +77,16 @@ impl<'a> fmt::Debug for Relations<'a> {
     }
 }
 
-impl<'a> Relations<'a> {
-    pub fn init(e: &'a Vec<Entity>) -> Relations<'a> {
-        let s = e.len();
-        let r: Vec<Vec<Option<RelationType>>> = vec![vec![None; s]; s];
+impl Relations {
+    pub fn init(size: usize) -> Relations {
+        let mut entites: Vec<Entity> = vec![];
+        for i in 0..size {
+            entites.push(Entity{ name: format!("ent{:02}", i) });
+        }
 
-        Relations{ entites: e, relations: r }
+        let relations: Vec<Vec<Option<RelationType>>> = vec![vec![None; size]; size];
+
+        Relations{ entites, relations }
     }
 
     fn add(&mut self, source: usize, destiny: usize, rt : RelationType) {
@@ -161,7 +165,7 @@ impl<'a> Relations<'a> {
         for e in self.entites.iter() {
             s += &format!("\t{}\n", e.name);
         }
-        
+
         s += "\n";
         let n = self.entites.len();
         for i in 0..n {
@@ -214,14 +218,8 @@ fn main() {
 
     info!("Random Mythos engage");
 
-    let mut entites: Vec<Entity> = vec![];
-    for i in 0..10 {
-        entites.push(Entity{ name: format!("ent{:02}", i) });
-    }
-
-    let mut relations = Relations::init(&entites);
+    let mut relations = Relations::init(10);
     
     relations.generate_base_relation();
-//    println!("{:?}", relations);
     relations.generate_dot(None);
 }
