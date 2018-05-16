@@ -48,8 +48,8 @@ struct Entity {
 #[allow(dead_code)]
 #[derive(Debug, PartialEq, Eq, Clone)]
 enum RelationType {
+    Base,
     Parent,
-    Other,
 }
 
 
@@ -85,7 +85,6 @@ impl<'a> Relations<'a> {
         Relations{ entites: e, relations: r }
     }
 
-    #[allow(dead_code)]
     fn add(&mut self, source: usize, destiny: usize, rt : RelationType) {
         self.relations[source][destiny] = Some(rt);
     }
@@ -103,7 +102,7 @@ impl<'a> Relations<'a> {
         v
     }
 
-    fn generate_child_parent(&mut self) {
+    fn generate_base_relation(&mut self) {
         let s = self.entites.len();
         trace!("self.entites: {}", s);
 
@@ -111,38 +110,38 @@ impl<'a> Relations<'a> {
         trace!("num relations: {}", n);
 
         for _i in 0..n {
-            let mut i_parent = rand::thread_rng().gen_range(0, s);
-            let mut i_child = rand::thread_rng().gen_range(0, s);
-            trace!("parent: {:?}, child: {:?}", i_parent, i_child);
+            let mut src = rand::thread_rng().gen_range(0, s);
+            let mut dest = rand::thread_rng().gen_range(0, s);
+            trace!("src: {:?}, dest: {:?}", src, dest);
             
-            while i_parent == i_child  {
-                trace!("I can't be my own parent");
-                i_child = rand::thread_rng().gen_range(0, s);
-                trace!("New child: {}", i_child);
+            while src == dest  {
+                trace!("I can't be my own src");
+                dest = rand::thread_rng().gen_range(0, s);
+                trace!("New dest: {}", dest);
             }
             
-            while let &Some(ref _rt) = &self.relations[i_parent][i_child] {
-                trace!("You already are the parent");
-                i_parent = rand::thread_rng().gen_range(0, s);
-                trace!("New parent: {}", i_parent);
+            while let &Some(ref _rt) = &self.relations[src][dest] {
+                trace!("You already are the src");
+                src = rand::thread_rng().gen_range(0, s);
+                trace!("New src: {}", src);
             }
 
             let mut stack: Vec<usize> = vec![];
             let mut verif = vec![false; n];
-            stack.push(i_child);
+            stack.push(dest);
             trace!("Verificando ciclos");
             while let Some(top) = stack.pop() {
                 trace!("v: {}", top);
 
-                if verif[top] || top == i_parent {
+                if verif[top] || top == src {
                     trace!("A cicle identifyed");
 
                     stack.clear();
                     verif = vec![false; n];
-                    i_child = rand::thread_rng().gen_range(0, s);
-                    stack.push(i_child);
+                    dest = rand::thread_rng().gen_range(0, s);
+                    stack.push(dest);
 
-                    trace!("New child: {}",i_child);
+                    trace!("New dest: {}",dest);
 
                 } else {
                     verif[top] = true;
@@ -151,8 +150,8 @@ impl<'a> Relations<'a> {
                 }
             }
 
-            info!("parent: {:?}, child: {:?}", i_parent, i_child);
-            self.relations[i_parent][i_child] = Some(RelationType::Parent);
+            info!("src: {:?}, dest: {:?}", src, dest);
+            self.add(src, dest, RelationType::Base);
         }
     }
 
@@ -168,7 +167,21 @@ impl<'a> Relations<'a> {
         for i in 0..n {
             for j in 0..n {
                 match &self.relations[i][j] {
-                    &Some(RelationType::Parent) => s += &format!("\t {} -> {}\n", self.entites[i].name, self.entites[j].name),
+                    &Some(RelationType::Parent) => {
+                        s += &format!(
+                            "\t {} -> {}\n",
+                            self.entites[i].name,
+                            self.entites[j].name
+                        )
+                    },
+
+                    &Some(RelationType::Base) => {
+                        s += &format!(
+                            "\t {} -> {} [color=\"grey41\"]\n",
+                            self.entites[i].name,
+                            self.entites[j].name
+                        )
+                    },
                     _ => s += "",
                 };
             }
@@ -208,7 +221,7 @@ fn main() {
 
     let mut relations = Relations::init(&entites);
     
-    relations.generate_child_parent();
-    println!("{:?}", relations);
+    relations.generate_base_relation();
+//    println!("{:?}", relations);
     relations.generate_dot(None);
 }
