@@ -58,10 +58,12 @@ impl Entity {
 
 
 #[allow(dead_code)]
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum RelationType {
 	Base,
 	Parent,
+	Invoker,
+	Creator,
 }
 
 
@@ -111,9 +113,22 @@ impl Relations {
 	fn adjacent_out(&mut self, vertex: usize) -> Vec<usize> {
 		let mut v: Vec<usize> = vec![];
 		
-		for j in 0..self.relations[vertex].len() {
+		for j in 0..self.entites.len() {
 			match &self.relations[vertex][j] {
 				&Some(_) => v.push(j),
+				&None => (),
+			}
+		}
+
+		v
+	}
+
+	fn adjacent_in(&mut self, vertex: usize) -> Vec<usize> {
+		let mut v: Vec<usize> = vec![];
+		
+		for i in 0..self.entites.len() {
+			match &self.relations[i][vertex] {
+				&Some(_) => v.push(i),
 				&None => (),
 			}
 		}
@@ -174,10 +189,39 @@ impl Relations {
 		}
 	}
 
+	fn generate_relations(&mut self) {
+		let n = self.entites.len();
+		info!("n relations: {}", n);
+
+		for e in 0..n {
+			info!("ent: {}", self.entites[e].name);
+			let adj_in = self.adjacent_in(e);
+			trace!("adj_in: {:?}", adj_in);
+
+			let rt_n = rand::thread_rng().gen_range(0, 3);
+
+			let rt: RelationType = match rt_n {
+				0 => RelationType::Parent,
+				1 => RelationType::Invoker,
+				2 => RelationType::Creator,
+				
+				_ => panic!("Help"),
+			};
+
+			info!("rt: {:?}", rt);
+			for src in adj_in.iter() {
+				trace!("src {}", src);
+				self.relations[*src][e] = Some(rt);
+			}
+		}
+	}
+
 	fn generate_dot(&mut self, name: Option<String>) {
 		let get_color = |rt: &RelationType| -> &str {
 			match rt {
 				&RelationType::Base => "#909090",
+				&RelationType::Invoker => "red",
+				&RelationType::Creator => "green",
 				&RelationType::Parent => "#000000",
 			}
 		};
@@ -229,7 +273,7 @@ impl Relations {
 fn set_logger() {
 	use simplelog::*;
 	
-	TermLogger::init(LevelFilter::Trace, Config::default()).unwrap();
+	TermLogger::init(LevelFilter::Debug, Config::default()).unwrap();
 }
 
 
@@ -241,5 +285,7 @@ fn main() {
 	let mut relations = Relations::init(10);
 	
 	relations.generate_base_relation();
+	relations.generate_relations();
+
 	relations.generate_dot(None);
 }
