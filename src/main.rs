@@ -110,7 +110,7 @@ impl Relations {
 		self.relations[source][destiny] = Some(rt);
 	}
 
-	fn adjacent_out(&mut self, vertex: usize) -> Vec<usize> {
+	fn adjacent_out(&self, vertex: usize) -> Vec<usize> {
 		let mut v: Vec<usize> = vec![];
 		
 		for j in 0..self.entites.len() {
@@ -123,7 +123,7 @@ impl Relations {
 		v
 	}
 
-	fn adjacent_in(&mut self, vertex: usize) -> Vec<usize> {
+	fn adjacent_in(&self, vertex: usize) -> Vec<usize> {
 		let mut v: Vec<usize> = vec![];
 		
 		for i in 0..self.entites.len() {
@@ -216,6 +216,50 @@ impl Relations {
 		}
 	}
 
+    fn get_entities_in_rt(&self, rt: RelationType) -> Vec<usize> {
+        let mut v: Vec<usize> = vec![];
+
+        for e in 0..self.entites.len() {
+            let adj_in = self.adjacent_in(e);
+            if adj_in.len() == 0 { continue; }
+
+            let r = self.relations[adj_in[0]][e].unwrap();
+
+            if r == rt { v.push(e); }
+        }
+
+        v
+    }
+
+    fn correct_levels(&mut self) {
+        info!("Fixing invoker level");
+
+        let entites = self.get_entities_in_rt(RelationType::Creator);
+        trace!("{:?}", entites);
+        for e in entites.iter() {
+            let adj_in = self.adjacent_in(*e);
+
+            let mut sum: i8 = 0;
+            for a in adj_in.iter() { sum += self.entites[*a].level; }
+
+            let avg = sum / (adj_in.len() as i8) ;
+            trace!("vertex: {}", *e);
+            trace!("avg: {}", avg);
+            
+            let mut stack:Vec<usize> = vec![];
+			stack.push(*e);
+			while let Some(top) = stack.pop() {
+				trace!("top: {}", top);
+                self.entites[top].level += avg + 1;
+
+                let adj_out = self.adjacent_out(top);
+                trace!("adj_out: {:?}", adj_out);
+                for en in adj_out.iter() { stack.push(*en); }
+            }
+        }
+        
+    }
+
 	fn generate_dot(&mut self, name: Option<String>) {
 		let get_color = |rt: &RelationType| -> &str {
 			match rt {
@@ -273,7 +317,7 @@ impl Relations {
 fn set_logger() {
 	use simplelog::*;
 	
-	TermLogger::init(LevelFilter::Debug, Config::default()).unwrap();
+	TermLogger::init(LevelFilter::Trace, Config::default()).unwrap();
 }
 
 
@@ -282,10 +326,11 @@ fn main() {
 
 	info!("Random Mythos engage");
 
-	let mut relations = Relations::init(10);
+	let mut relations = Relations::init(21);
 	
 	relations.generate_base_relation();
 	relations.generate_relations();
+    relations.correct_levels();
 
 	relations.generate_dot(None);
 }
