@@ -193,6 +193,7 @@ impl Relations {
 		let n = self.entites.len();
 		info!("n relations: {}", n);
 
+		let mut dots = 0;
 		for e in 0..n {
 			info!("ent: {}", self.entites[e].name);
 			let adj_in = self.adjacent_in(e);
@@ -213,53 +214,48 @@ impl Relations {
 				trace!("src {}", src);
 				self.relations[*src][e] = Some(rt);
 			}
+			
+			if adj_in.len() == 0 { continue; }
+			self.fix_levels(e, rt);
+
+			self.generate_dot(Some(format!("fixing_{:02}", dots)));
+			dots += 1;
 		}
 	}
 
-    fn get_entities_in_rt(&self, rt: RelationType) -> Vec<usize> {
-        let mut v: Vec<usize> = vec![];
+	fn fix_levels(&mut self, dest: usize, rt: RelationType) {
+		info!("Fixing level of {} with {:?}", dest, rt);
+		
+		let adj_in = self.adjacent_in(dest);
+		let mut min = 0;
+		let mut max = 0;
+		for e in adj_in.iter() {
+			let l = self.entites[*e].level;
 
-        for e in 0..self.entites.len() {
-            let adj_in = self.adjacent_in(e);
-            if adj_in.len() == 0 { continue; }
+			if l > max { max = l; }
+			if l < min { min = l; }
+		}
 
-            let r = self.relations[adj_in[0]][e].unwrap();
+		trace!("adj_in: {:?}", adj_in);
+		trace!("min: {}, max: {}", min, max);
 
-            if r == rt { v.push(e); }
-        }
+		let inc = match rt {
+			RelationType::Creator => max+1,	
+			RelationType::Invoker => min-1,
+			RelationType::Parent => min,
+			_ => 0,
+		};
 
-        v
-    }
+		let mut stack: Vec<usize> = vec![];
+		stack.push(dest);
+		while let Some(top) = stack.pop() {
+			self.entites[top].level += inc;
+			trace!("top: {}, new_value {}", top, self.entites[top].level);
 
-    fn correct_levels(&mut self) {
-        info!("Fixing invoker level");
-
-        let entites = self.get_entities_in_rt(RelationType::Creator);
-        trace!("{:?}", entites);
-        for e in entites.iter() {
-            let adj_in = self.adjacent_in(*e);
-
-            let mut sum: i8 = 0;
-            for a in adj_in.iter() { sum += self.entites[*a].level; }
-
-            let avg = sum / (adj_in.len() as i8) ;
-            trace!("vertex: {}", *e);
-            trace!("avg: {}", avg);
-            
-            let mut stack:Vec<usize> = vec![];
-			stack.push(*e);
-			while let Some(top) = stack.pop() {
-				trace!("top: {}", top);
-                self.entites[top].level += avg + 1;
-
-                let adj_out = self.adjacent_out(top);
-                trace!("adj_out: {:?}", adj_out);
-                for en in adj_out.iter() { stack.push(*en); }
-            }
-        }
-        
-    }
-
+			for e in self.adjacent_out(top).iter() { stack.push(*e); }
+		}
+	}
+	
 	fn generate_dot(&mut self, name: Option<String>) {
 		let get_color = |rt: &RelationType| -> &str {
 			match rt {
@@ -326,11 +322,10 @@ fn main() {
 
 	info!("Random Mythos engage");
 
-	let mut relations = Relations::init(21);
+	let mut relations = Relations::init(42);
 	
 	relations.generate_base_relation();
 	relations.generate_relations();
-    relations.correct_levels();
 
 	relations.generate_dot(None);
 }
