@@ -2,7 +2,7 @@
   "entites": [
     {
       "name": "ent00",
-      "level": 2
+      "level": 0
     },
     {
       "name": "ent01",
@@ -14,27 +14,27 @@
     },
     {
       "name": "ent03",
-      "level": -1
+      "level": 0
     },
     {
       "name": "ent04",
-      "level": 3
+      "level": 0
     },
     {
       "name": "ent05",
-      "level": 1
+      "level": 0
     },
     {
       "name": "ent06",
-      "level": 4
+      "level": 0
     },
     {
       "name": "ent07",
-      "level": 5
+      "level": 0
     },
     {
       "name": "ent08",
-      "level": 2
+      "level": 0
     },
     {
       "name": "ent09",
@@ -42,7 +42,7 @@
     },
     {
       "name": "ent10",
-      "level": 4
+      "level": 0
     },
     {
       "name": "ent11",
@@ -54,15 +54,15 @@
     },
     {
       "name": "ent13",
-      "level": 4
+      "level": 0
     },
     {
       "name": "ent14",
-      "level": 1
+      "level": 0
     },
     {
       "name": "ent15",
-      "level": 3
+      "level": 0
     },
     {
       "name": "ent16",
@@ -70,7 +70,7 @@
     },
     {
       "name": "ent17",
-      "level": -1
+      "level": 0
     },
     {
       "name": "ent18",
@@ -78,11 +78,11 @@
     },
     {
       "name": "ent19",
-      "level": 1
+      "level": 0
     },
     {
       "name": "ent20",
-      "level": -2
+      "level": 0
     },
     {
       "name": "ent21",

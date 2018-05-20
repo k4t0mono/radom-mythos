@@ -1,4 +1,5 @@
 // An attempt to make a procedural Mythos generator
+#![allow(dead_code)]
 #[macro_use]
 extern crate log;
 extern crate simplelog;
@@ -9,15 +10,78 @@ extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
 
-
 use rand::Rng;
-use std::fmt;
+use std::fs::OpenOptions;
+use std::io::prelude::*;
 
-mod utils;
+
+pub fn write_file<'a>(data: &'a str, path: &'a str) {
+	let f = OpenOptions::new()
+			.write(true)
+			.create(true)
+			.open(path);
+
+	let mut file = match f {
+		Err(e) => {
+			error!("Something is terrible wrong happend while oppening the file");
+			error!("{}", e);
+
+			panic!(e)
+		},
+
+		Ok(fl) => fl,
+	};
+	
+	match file.write_all(data.as_bytes()) {
+		Err(e) => {
+			error!("Something is terrible wrong happend while writing the file");
+			error!("{}", e);
+
+			panic!(e)
+		},
+
+		Ok(_) => info!("File {} writed sucessfully", path),
+	}
+}
+
+fn load_file<'a>(path: &'a str) -> String {
+    let f = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(path);
+
+    let mut file = match f {
+        Err(e) => {
+            error!("Something is terrible wrong happend while oppening the file");
+            error!("{}", e);
+
+            panic!(e)
+        },
+
+        Ok(fl) => fl,
+    };
+
+    let mut data = String::new();
+    match file.read_to_string(&mut data) {
+        Err(e) => {
+            error!("Something is terrible wrong happend while reading the file");
+            error!("{}", e);
+
+            panic!(e)
+        },
+
+        Ok(_) => info!("File opened"),
+    }
+    
+    data
+}
+
 
 trait Dot {
     fn to_dot(&self) -> String;
 }
+
 
 #[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
 struct Entity {
@@ -49,25 +113,6 @@ enum RelationType {
 struct Relations {
 	entites: Vec<Entity>,
 	relations: Vec<Vec<Option<RelationType>>>,
-}
-
-impl fmt::Debug for Relations {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let mut s: String = "".to_string();
-
-		for i in self.relations.iter() {
-			for j in i.iter() {
-				match j {
-					&None => s += "---",
-					&Some(ref v) => s += &format!("{:?}", v),
-				}
-				s += "\t";
-			}
-			s += "\n";
-		}
-
-		write!(f, "{}", s)
-	}
 }
 
 impl Relations {
@@ -305,11 +350,12 @@ fn main() {
 
 	info!("Random Mythos engage");
 
-	let mut relations = Relations::init(22);
-	
-	relations.generate_base_relation();
-	relations.generate_relations();
+	//let mut relations = Relations::init(22);
+	let relations = Relations::from_json(load_file("relations.json"));
 
-    utils::write_file(&relations.to_json(), "relations.json");
-    utils::write_file(&relations.to_dot(), "relations.dot");
+	//relations.generate_base_relation();
+	//relations.generate_relations();
+
+    //utils::write_file(&relations.to_json(), "relations.json");
+    write_file(&relations.to_dot(), "relations.dot");
 }
