@@ -3,50 +3,29 @@
 extern crate log;
 extern crate simplelog;
 extern crate rand;
+extern crate serde;
+extern crate serde_json;
 
-use std::fs::OpenOptions;
-use std::io::prelude::*;
+#[macro_use]
+extern crate serde_derive;
+
+
 use rand::Rng;
 use std::fmt;
 
-#[allow(dead_code)]
-fn write_file<'a>(name: &'a str, path: &'a str) {
-	let f = OpenOptions::new()
-			.write(true)
-			.create(true)
-			.open(path);
+mod utils;
 
-	let mut file = match f {
-		Err(e) => {
-			error!("Something is terrible wrong happend while oppening the file");
-			error!("{}", e);
-
-			panic!(e)
-		},
-
-		Ok(fl) => fl,
-	};
-	
-	match file.write_all(name.as_bytes()) {
-		Err(e) => {
-			error!("Something is terrible wrong happend while writing the file");
-			error!("{}", e);
-
-			panic!(e)
-		},
-
-		Ok(_) => info!("File {} writed sucessfully", path),
-	}
+trait Dot {
+    fn to_dot(&self) -> String;
 }
 
-
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
 struct Entity {
 	name: String,
 	level: i8,
 }
 
-impl Entity {
+impl Dot for Entity {
 	fn to_dot(&self) -> String {
 		format!(
 			"{0} [label=\"{{ {0} | {1} }}\"]",
@@ -57,8 +36,7 @@ impl Entity {
 }
 
 
-#[allow(dead_code)]
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Deserialize, Serialize)]
 enum RelationType {
 	Base,
 	Parent,
@@ -67,6 +45,7 @@ enum RelationType {
 }
 
 
+#[derive(Deserialize, Serialize)]
 struct Relations {
 	entites: Vec<Entity>,
 	relations: Vec<Vec<Option<RelationType>>>,
@@ -105,6 +84,12 @@ impl Relations {
 
 		Relations{ entites, relations }
 	}
+
+    pub fn from_json(json: String) -> Relations {
+        let r: Relations = serde_json::from_str(&json).unwrap();
+
+        r
+    }
 
 	fn add(&mut self, source: usize, destiny: usize, rt : RelationType) {
 		self.relations[source][destiny] = Some(rt);
@@ -193,7 +178,7 @@ impl Relations {
 		let n = self.entites.len();
 		info!("n relations: {}", n);
 
-		let mut dots = 0;
+		//let mut dots = 0;
 		for e in 0..n {
 			info!("ent: {}", self.entites[e].name);
 			let adj_in = self.adjacent_in(e);
@@ -215,11 +200,9 @@ impl Relations {
 				self.relations[*src][e] = Some(rt);
 			}
 			
-			if adj_in.len() == 0 { continue; }
-			self.fix_levels(e, rt);
-
-			self.generate_dot(Some(format!("fixing_{:02}", dots)));
-			dots += 1;
+			if adj_in.len() > 0 { self.fix_levels(e, rt); }
+			//self.generate_dot(Some(format!("fixing_{:02}", dots)));
+			//dots += 1;
 		}
 	}
 
@@ -255,8 +238,16 @@ impl Relations {
 			for e in self.adjacent_out(top).iter() { stack.push(*e); }
 		}
 	}
-	
-	fn generate_dot(&mut self, name: Option<String>) {
+
+    fn to_json(&self) -> String {
+        let j = serde_json::to_string_pretty(self).unwrap();
+
+        j
+    }
+}
+
+impl Dot for Relations {
+	fn to_dot(&self) -> String {
 		let get_color = |rt: &RelationType| -> &str {
 			match rt {
 				&RelationType::Base => "#909090",
@@ -296,16 +287,8 @@ impl Relations {
 		}
 
 		s += "}";
-		let s_slice: &str = &*s;
-		
-		let fl: String;
-		match name {
-			None => fl = "relations.dot".to_string(),
-			Some(n) => fl = n + ".dot",
-		}
-		let fl_slice: &str = &*fl;
-		
-		write_file(&s_slice, &fl_slice);
+
+        s
 	}
 }
 
@@ -313,7 +296,7 @@ impl Relations {
 fn set_logger() {
 	use simplelog::*;
 	
-	TermLogger::init(LevelFilter::Trace, Config::default()).unwrap();
+	TermLogger::init(LevelFilter::Info, Config::default()).unwrap();
 }
 
 
@@ -322,10 +305,11 @@ fn main() {
 
 	info!("Random Mythos engage");
 
-	let mut relations = Relations::init(42);
+	let mut relations = Relations::init(22);
 	
 	relations.generate_base_relation();
 	relations.generate_relations();
 
-	relations.generate_dot(None);
+    utils::write_file(&relations.to_json(), "relations.json");
+    utils::write_file(&relations.to_dot(), "relations.dot");
 }
