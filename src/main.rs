@@ -14,7 +14,6 @@ use rand::Rng;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
 
-
 pub fn write_file<'a>(data: &'a str, path: &'a str) {
 	let f = OpenOptions::new()
 			.write(true)
@@ -284,6 +283,64 @@ impl Relations {
 		}
 	}
 
+    fn entity_description(&self, e: usize) -> String {
+        let get_names = |v: Vec<usize>| -> String {
+            let n = v.len();
+            let mut s: String = "".to_string();
+            
+            s += &self.entites[v[0]].name;
+
+            if n == 2 {
+                s += &format!(" and {}", &self.entites[v[0]].name);
+
+            } else if n > 2 {
+                for i in 1..n-1 {
+                    s += &format!(", {}", &self.entites[v[i]].name);
+                }
+
+                s += &format!(" and {}", &self.entites[v[n-1]].name);
+            }
+
+            s
+        };
+
+        let mut s: String = format!("{}", self.entites[e].name);
+
+        let adj_in = self.adjacent_in(e);
+
+        if adj_in.len() == 0 {
+            s += " children of the Void";
+
+        } else {
+            let rt = self.relations[adj_in[0]][e].unwrap();
+
+            s += match rt {
+                RelationType::Invoker => " invoked by",
+                RelationType::Creator => " created by",
+                RelationType::Parent => " children of",
+                _ => "",
+            };
+
+            s += &format!(" {}", get_names(adj_in));
+        }
+
+        s += ".";
+        s
+    }
+
+    fn get_descriptions(&self) -> String {
+        let mut s: String = "".to_string();
+        let n = self.entites.len();
+
+        for i in 0..n-1 {
+            s += &format!("{}\n", self.entity_description(i));
+        }
+        s += &self.entity_description(n-1);
+
+        s
+    }
+
+
     fn to_json(&self) -> String {
         let j = serde_json::to_string_pretty(self).unwrap();
 
@@ -337,7 +394,6 @@ impl Dot for Relations {
 	}
 }
 
-
 fn set_logger() {
 	use simplelog::*;
 	
@@ -358,4 +414,6 @@ fn main() {
 
     //utils::write_file(&relations.to_json(), "relations.json");
     write_file(&relations.to_dot(), "relations.dot");
+
+    println!("{}", relations.get_descriptions());
 }
