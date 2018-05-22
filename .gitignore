@@ -4,5 +4,7 @@
 **/*.dot
 **/*.png
 **/*.json
+**/relations*
 **/*.sh
 /bin
+/

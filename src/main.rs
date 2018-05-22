@@ -18,70 +18,32 @@ use std::io;
 use docopt::Docopt;
 
 pub fn write_file<'a>(data: &'a str, path: &'a str) {
-	let f = OpenOptions::new()
+	let mut f = OpenOptions::new()
 			.write(true)
 			.create(true)
-			.open(path);
+			.open(path)
+			.unwrap();
 
-	let mut file = match f {
-		Err(e) => {
-			error!("Something is terrible wrong happend while oppening the file");
-			error!("{}", e);
-
-			panic!(e)
-		},
-
-		Ok(fl) => fl,
-	};
-	
-	match file.write_all(data.as_bytes()) {
-		Err(e) => {
-			error!("Something is terrible wrong happend while writing the file");
-			error!("{}", e);
-
-			panic!(e)
-		},
-
-		Ok(_) => info!("File {} writed sucessfully", path),
-	}
+	f.write_all(data.as_bytes()).unwrap();
 }
 
 fn load_file<'a>(path: &'a str) -> String {
-    let f = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .open(path);
+	let mut f = OpenOptions::new()
+			.read(true)
+			.write(true)
+			.create(true)
+			.open(path)
+			.unwrap();
 
-    let mut file = match f {
-        Err(e) => {
-            error!("Something is terrible wrong happend while oppening the file");
-            error!("{}", e);
-
-            panic!(e)
-        },
-
-        Ok(fl) => fl,
-    };
-
-    let mut data = String::new();
-    match file.read_to_string(&mut data) {
-        Err(e) => {
-            error!("Something is terrible wrong happend while reading the file");
-            error!("{}", e);
-
-            panic!(e)
-        },
-
-        Ok(_) => info!("File opened"),
-    }
-    
-    data
+	let mut data = String::new();
+	f.read_to_string(&mut data).unwrap();
+	
+	data
 }
 
 
 trait Dot {
-    fn to_dot(&self) -> String;
+	fn to_dot(&self) -> String;
 }
 
 
@@ -94,7 +56,7 @@ struct Entity {
 impl Dot for Entity {
 	fn to_dot(&self) -> String {
 		format!(
-			"{0} [label=\"{{ {0} | {1} }}\"]",
+			"{0} [label=\"{{ {0} | {1} }}\" color=\"#e9e9f4\" fontcolor=\"#e9e9f4\"]",
 			self.name,
 			self.level,
 		)
@@ -132,11 +94,11 @@ impl Relations {
 		Relations{ entites, relations }
 	}
 
-    pub fn from_json(json: String) -> Relations {
-        let r: Relations = serde_json::from_str(&json).unwrap();
+	pub fn from_json(json: String) -> Relations {
+		let r: Relations = serde_json::from_str(&json).unwrap();
 
-        r
-    }
+		r
+	}
 
 	fn add(&mut self, source: usize, destiny: usize, rt : RelationType) {
 		self.relations[source][destiny] = Some(rt);
@@ -222,7 +184,10 @@ impl Relations {
 	}
 
 	fn generate_relations(&mut self) {
-		let n = self.entites.len();
+		let mut n = self.entites.len();
+
+		if n < 5 { n -= 1; }
+
 		info!("n relations: {}", n);
 
 		for e in 0..n {
@@ -248,69 +213,74 @@ impl Relations {
 		}
 	}
 
-    fn entity_description(&self, e: usize) -> String {
-        let get_names = |v: Vec<usize>| -> String {
-            let n = v.len();
-            let mut s: String = "".to_string();
-            
-            s += &self.entites[v[0]].name;
+	fn entity_description(&self, e: usize) -> String {
+		let get_names = |v: Vec<usize>| -> String {
+			let n = v.len();
+			let mut s: String = String::new();
+			
+			s += &self.entites[v[0]].name;
 
-            if n == 2 {
-                s += &format!(" and {}", &self.entites[v[0]].name);
+			if n == 2 {
+				s += &format!(" and {}", &self.entites[v[1]].name);
 
-            } else if n > 2 {
-                for i in 1..n-1 {
-                    s += &format!(", {}", &self.entites[v[i]].name);
-                }
+			} else if n > 2 {
+				for i in 1..n-1 {
+					s += &format!(", {}", &self.entites[v[i]].name);
+				}
 
-                s += &format!(" and {}", &self.entites[v[n-1]].name);
-            }
+				s += &format!(" and {}", &self.entites[v[n-1]].name);
+			}
 
-            s
-        };
-
-        let mut s: String = format!("{}", self.entites[e].name);
-
-        let adj_in = self.adjacent_in(e);
-
-        if adj_in.len() == 0 {
-            s += " children of the Void";
-
-        } else {
-            let rt = self.relations[adj_in[0]][e].unwrap();
-
-            s += match rt {
-                RelationType::Invoker => " invoked by",
-                RelationType::Creator => " created by",
-                RelationType::Parent => " children of",
-                _ => "",
-            };
-
-            s += &format!(" {}", get_names(adj_in));
-        }
-
-        s += ".";
-        s
-    }
-
-    fn get_descriptions(&self) -> String {
-        let mut s: String = "".to_string();
-        let n = self.entites.len();
-
-        for i in 0..n-1 {
-            s += &format!("{}\n", self.entity_description(i));
-        }
-        s += &self.entity_description(n-1);
-
-        s
-    }
+			s
+		};
 
 
-    fn to_json(&self) -> String {
-        let j = serde_json::to_string_pretty(self).unwrap();
+		let mut s: String = format!("{}", self.entites[e].name);
 
-        j
-    }
+		let adj_in = self.adjacent_in(e);
+		if adj_in.len() == 0 {
+			s += " children of the Void";
+
+		} else {
+			let rt = self.relations[adj_in[0]][e].unwrap();
+
+			s += match rt {
+				RelationType::Invoker => " invoked by",
+				RelationType::Creator => " created by",
+				RelationType::Parent => " children of",
+				_ => "",
+			};
+
+			s += &format!(" {}", get_names(adj_in));
+		}
+
+		s += ".";
+		s
+	}
+
+	fn get_descriptions(&self) -> String {
+		let mut s: String = String::new();
+		let n = self.entites.len();
+
+		for i in 0..n-1 {
+			s += &format!("{}\n", self.entity_description(i));
+		}
+		s += &self.entity_description(n-1);
+
+		s
+	}
+
+
+	fn to_json(&self) -> String {
+		let j = serde_json::to_string_pretty(self).unwrap();
+
+		j
+	}
+
+	fn generate(&mut self) {
+		self.generate_base_relation();
+		self.generate_relations();
+	}
 }
 
 impl Dot for Relations {
@@ -318,9 +288,9 @@ impl Dot for Relations {
 		let get_color = |rt: &RelationType| -> &str {
 			match rt {
 				&RelationType::Base => "#909090",
-				&RelationType::Invoker => "red",
-				&RelationType::Creator => "green",
-				&RelationType::Parent => "#000000",
+				&RelationType::Invoker => "#ea51b2",
+				&RelationType::Creator => "#00f769",
+				&RelationType::Parent => "#62d6e8",
 			}
 		};
 
@@ -334,7 +304,7 @@ impl Dot for Relations {
 		};
 
 		let mut s: String = "digraph G {\n".to_string();
-
+		s += "\tgraph [bgcolor=\"#282936\"]\n";
 		s += "\tnode [shape=record style=rounded]\n\n";
 
 		for e in self.entites.iter() {
@@ -355,7 +325,7 @@ impl Dot for Relations {
 
 		s += "}";
 
-        s
+		s
 	}
 }
 
@@ -363,77 +333,74 @@ const USAGE: &'static str = "
 random-mythos
 
 Usage:
-    random-mythos (-h | --help)
-    random-mythos --version
-    random-mythos [--verbose=<n>]
+	random-mythos (-h | --help)
+	random-mythos --version
+	random-mythos [--verbose=<n>]
 
 Options:
-    -h --help      Show this screen.
-    --version      Show version
-    --verbose=<n>  Set log level
+	-h --help	   Show this screen.
+	--version	   Show version
+	--verbose=<n>  Set log level
 ";
 
 #[derive(Debug, Deserialize)]
 struct Args {
-    flag_verbose: usize,
-    flag_version: bool,
+	flag_verbose: usize,
+	flag_version: bool,
 }
 
 
 fn set_logger(level: usize) {
 	use simplelog::*;
 
-    let log_level: LevelFilter = match level {
-        0 => LevelFilter::Off,
-        1 => LevelFilter::Error,
-        2 => LevelFilter::Warn,
-        3 => LevelFilter::Info,
-        4 => LevelFilter::Debug,
-        5 => LevelFilter::Trace,
-        _ => LevelFilter::Off,
-    };
+	let log_level: LevelFilter = match level {
+		0 => LevelFilter::Off,
+		1 => LevelFilter::Error,
+		2 => LevelFilter::Warn,
+		3 => LevelFilter::Info,
+		4 => LevelFilter::Debug,
+		_ => LevelFilter::Trace,
+	};
 	
 	TermLogger::init(log_level, Config::default()).unwrap();
 }
 
 
 fn main() {
-    let args: Args = Docopt::new(USAGE)
-                            .and_then(|d| d.deserialize())
-                            .unwrap_or_else(|e| e.exit());
+	let args: Args = Docopt::new(USAGE)
+		.and_then(|d| d.deserialize())
+		.unwrap_or_else(|e| e.exit());
 
-    if args.flag_version {
-        println!("random-mythos-v0.1.0");
-        return;
-    }
+	if args.flag_version {
+		println!("random-mythos-v0.1.0");
+		return;
+	}
 
-    set_logger(args.flag_verbose);
+	set_logger(args.flag_verbose);
 
 	info!("Random Mythos engage");
-    io::stdout().flush().unwrap();
+	io::stdout().flush().unwrap();
 
-    print!("Number of entites to generate: ");
-    io::stdout().flush().unwrap();
+	print!("Number of entites to generate: ");
+	io::stdout().flush().unwrap();
 
-    let mut num = String::new();
-    io::stdin().read_line(&mut num)
-        .expect("Failed to read line");
+	let mut num = String::new();
+	io::stdin().read_line(&mut num)
+		.expect("Failed to read line");
 
-    let num: usize = match num.trim().parse() {
-        Ok(num) => num,
-        Err(_) => panic!("Enter a number"),
-    };
+	let num: usize = match num.trim().parse() {
+		Ok(num) => num,
+		Err(_) => panic!("Enter a number"),
+	};
 
-    let mut relations = Relations::init(num);
+	let mut relations = Relations::init(num);
+	relations.generate();
 
-    relations.generate_base_relation();
-    relations.generate_relations();
+	write_file(&relations.to_json(), "relations.json");
+	write_file(&relations.to_dot(), "relations.dot");
 
-    write_file(&relations.to_json(), "relations.json");
-    write_file(&relations.to_dot(), "relations.dot");
+	let desc = relations.get_descriptions();
+	write_file(&desc, "relations.md");
 
-    let desc = relations.get_descriptions();
-    write_file(&desc, "relations.md");
-
-    println!("{}", relations.get_descriptions());
+	println!("{}", relations.get_descriptions());
 }
