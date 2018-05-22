@@ -21,6 +21,7 @@ pub fn write_file<'a>(data: &'a str, path: &'a str) {
 	let mut f = OpenOptions::new()
 			.write(true)
 			.create(true)
+			.truncate(true)
 			.open(path)
 			.unwrap();
 
@@ -30,8 +31,6 @@ pub fn write_file<'a>(data: &'a str, path: &'a str) {
 fn load_file<'a>(path: &'a str) -> String {
 	let mut f = OpenOptions::new()
 			.read(true)
-			.write(true)
-			.create(true)
 			.open(path)
 			.unwrap();
 
@@ -135,9 +134,11 @@ impl Relations {
 		trace!("self.entites: {}", s);
 
 		let n = s as usize;
+		let mut n_gem = n;
+		if n < 5 { n_gem -= 1; }
 		trace!("num relations: {}", n);
 
-		for _i in 0..n {
+		for _i in 0..n_gem {
 			let mut src = rand::thread_rng().gen_range(0, s);
 			let mut dest = rand::thread_rng().gen_range(0, s);
 			trace!("src: {:?}, dest: {:?}", src, dest);
@@ -184,9 +185,7 @@ impl Relations {
 	}
 
 	fn generate_relations(&mut self) {
-		let mut n = self.entites.len();
-
-		if n < 5 { n -= 1; }
+		let n = self.entites.len();
 
 		info!("n relations: {}", n);
 
