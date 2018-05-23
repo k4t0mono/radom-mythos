@@ -17,6 +17,8 @@ use std::io::prelude::*;
 use std::io;
 use docopt::Docopt;
 
+mod test;
+
 pub fn write_file<'a>(data: &'a str, path: &'a str) {
 	let mut f = OpenOptions::new()
 			.write(true)
@@ -80,6 +82,8 @@ struct Relations {
 
 impl Relations {
 	pub fn init(size: usize) -> Relations {
+        if size == 0 { panic!("Size must be grater then 0"); }
+
 		let mut entites: Vec<Entity> = vec![];
 		for i in 0..size {
 			entites.push(Entity{
