@@ -332,20 +332,26 @@ const USAGE: &'static str = "
 random-mythos
 
 Usage:
+	random-mythos 
 	random-mythos (-h | --help)
-	random-mythos --version
-	random-mythos [--verbose=<n>]
+	random-mythos (-v | --version)
+	random-mythos [options] <file>
 
 Options:
-	-h --help	   Show this screen.
-	--version	   Show version
-	--verbose=<n>  Set log level
+	-h --help           Show this screen
+	-v --version        Show version
+	-d --gen-dot        Generate relations' graph dot file 
+	--verbose=<n>       Set log level
+	--export=<json>     Export relations to JSON file
 ";
 
 #[derive(Debug, Deserialize)]
 struct Args {
 	flag_verbose: usize,
 	flag_version: bool,
+	flag_gen_dot: bool,
+	flag_export: Option<String>,
+	arg_file: String,
 }
 
 
@@ -360,7 +366,7 @@ fn set_logger(level: usize) {
 		4 => LevelFilter::Debug,
 		_ => LevelFilter::Trace,
 	};
-	
+
 	TermLogger::init(log_level, Config::default()).unwrap();
 }
 
@@ -376,6 +382,7 @@ fn main() {
 	}
 
 	set_logger(args.flag_verbose);
+	println!("{:?}", args);
 
 	info!("Random Mythos engage");
 	io::stdout().flush().unwrap();
@@ -395,11 +402,16 @@ fn main() {
 	let mut relations = Relations::init(num);
 	relations.generate();
 
-	write_file(&relations.to_json(), "relations.json");
-	write_file(&relations.to_dot(), "relations.dot");
+	if args.flag_export.is_some() {
+		write_file(&relations.to_json(), &args.flag_export.unwrap());
+	}
+
+	if args.flag_gen_dot {
+		write_file(&relations.to_dot(), "relations.dot");
+	}
 
 	let desc = relations.get_descriptions();
-	write_file(&desc, "relations.md");
+	write_file(&desc, &args.arg_file);
 
 	println!("{}", relations.get_descriptions());
 }
