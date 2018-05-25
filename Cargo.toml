@@ -1,6 +1,6 @@
 [package]
 name = "random-mythos"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["KatoMono Enkeli <k4t0mono@gmail.com>"]
 
 [dependencies]

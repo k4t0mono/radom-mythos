@@ -400,10 +400,9 @@ const USAGE: &'static str = "
 random-mythos
 
 Usage:
-	random-mythos 
+	random-mythos [options] <file>
 	random-mythos (-h | --help)
 	random-mythos (-v | --version)
-	random-mythos [options] <file>
 
 Options:
 	-h --help           Show this screen
@@ -465,7 +464,7 @@ fn main() {
 		.unwrap_or_else(|e| e.exit());
 
 	if args.flag_version {
-		println!("random-mythos-v0.1.0");
+		println!("random-mythos-v{}", env!("CARGO_PKG_VERSION"));
 		return;
 	}
 
