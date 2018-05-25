@@ -12,6 +12,7 @@ extern crate serde_derive;
 extern crate docopt;
 
 use rand::Rng;
+use std::collections::VecDeque;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
 use std::io;
@@ -30,7 +31,7 @@ pub fn write_file<'a>(data: &'a str, path: &'a str) {
 	f.write_all(data.as_bytes()).unwrap();
 }
 
-fn load_file<'a>(path: &'a str) -> String {
+fn read_file<'a>(path: &'a str) -> String {
 	let mut f = OpenOptions::new()
 			.read(true)
 			.open(path)
@@ -51,7 +52,7 @@ trait Dot {
 #[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
 struct Entity {
 	name: String,
-	level: i8,
+	level: i32,
 }
 
 impl Dot for Entity {
@@ -193,6 +194,7 @@ impl Relations {
 
 		info!("n relations: {}", n);
 
+        let mut dots = 1;
 		for e in 0..n {
 			info!("ent: {}", self.entites[e].name);
 			let adj_in = self.adjacent_in(e);
@@ -213,8 +215,70 @@ impl Relations {
 				trace!("src {}", src);
 				self.relations[*src][e] = Some(rt);
 			}
+
+            if !adj_in.is_empty() { 
+                self.fix_levels(e, rt);
+                write_file(&self.to_dot(), &format!("fix_{:02}.dot", dots));
+                dots += 1;
+            }
 		}
 	}
+
+    fn fix_levels(&mut self, i: usize, rt: RelationType) {
+        /* TODO
+         * - Melhorar menssagens de debug 
+         * - Verificar Creator
+         */
+
+        info!("Fixing levels");
+
+        trace!("Fixing level of {:?}", self.entites[i].name);
+        let adj_in = self.adjacent_in(i);
+        trace!("adj_in: {:?}", adj_in);
+            
+        let mut min: i32 = self.entites[adj_in[0]].level;
+        for j in 1..adj_in.len() {
+            let l = self.entites[j].level;
+            if l < min { min = l; }
+        }
+
+        let inc = match rt {
+            RelationType::Invoker => -1,
+            RelationType::Creator => 1,
+            _ => 0,
+        };
+
+        let new_level = min + inc;
+        let delta = new_level - self.entites[i].level;
+
+        trace!("rt: {:?}", rt);
+        trace!("min: {}, inc: {}, l': {}, delta: {}", min, inc, new_level, delta);
+
+        self.entites[i].level = new_level;
+
+        trace!("Propagate new value");
+        let mut queue: VecDeque<usize> = VecDeque::new();
+        for j in self.adjacent_out(i).iter() { queue.push_back(*j); }
+        while !queue.is_empty() {
+            let first = queue.pop_front().unwrap();
+            trace!("first: {:?}", first);
+
+            let nl = self.entites[first].level + inc;
+            if nl <= self.entites[first].level {
+                trace!("Negative delta, set new level to {}", nl);
+                self.entites[first].level = nl;
+                for out in self.adjacent_out(first).iter() {
+                    queue.push_back(*out);
+                }
+
+            } else {
+                trace!("Positive delta, sticking with the old one");
+                queue.clear();
+            }
+        }
+    }
+
+    // ========================================================================================
 
 	fn entity_description(&self, e: usize) -> String {
 		let get_names = |v: Vec<usize>| -> String {
@@ -347,6 +411,7 @@ Options:
 	-d --gen-dot        Generate relations' graph dot file 
 	--verbose=<n>       Set log level
 	--export=<json>     Export relations to JSON file
+    --import=<json>     Import relations from JSON file
 ";
 
 #[derive(Debug, Deserialize)]
@@ -355,6 +420,7 @@ struct Args {
 	flag_version: bool,
 	flag_gen_dot: bool,
 	flag_export: Option<String>,
+    flag_import: Option<String>,
 	arg_file: String,
 }
 
@@ -374,23 +440,7 @@ fn set_logger(level: usize) {
 	TermLogger::init(log_level, Config::default()).unwrap();
 }
 
-
-fn main() {
-	let args: Args = Docopt::new(USAGE)
-		.and_then(|d| d.deserialize())
-		.unwrap_or_else(|e| e.exit());
-
-	if args.flag_version {
-		println!("random-mythos-v0.1.0");
-		return;
-	}
-
-	set_logger(args.flag_verbose);
-	println!("{:?}", args);
-
-	info!("Random Mythos engage");
-	io::stdout().flush().unwrap();
-
+fn init_relations() -> Relations {
 	print!("Number of entites to generate: ");
 	io::stdout().flush().unwrap();
 
@@ -405,6 +455,32 @@ fn main() {
 
 	let mut relations = Relations::init(num);
 	relations.generate();
+
+    relations
+}
+
+fn main() {
+	let args: Args = Docopt::new(USAGE)
+		.and_then(|d| d.deserialize())
+		.unwrap_or_else(|e| e.exit());
+
+	if args.flag_version {
+		println!("random-mythos-v0.1.0");
+		return;
+	}
+
+	set_logger(args.flag_verbose);
+
+	info!("Random Mythos engage");
+	io::stdout().flush().unwrap();
+
+    let relations: Relations;
+    if args.flag_import.is_some() {
+        relations = Relations::from_json(read_file(&args.flag_import.unwrap()));
+
+    } else {
+        relations = init_relations();
+    }
 
 	if args.flag_export.is_some() {
 		write_file(&relations.to_json(), &args.flag_export.unwrap());

@@ -55,6 +55,30 @@ mod tests {
 
 		assert_eq!(same_type, true);
 	}
+    
+    #[test]
+    fn should_have_correct_levels() {
+        let rs = Relations::init(42);
 
+        for e in 0..42 {
+            let adj_in = rs.adjacent_in(e);
+            if adj_in.is_empty() { continue; }
+
+            let rt = rs.relations[adj_in[0]][e].unwrap();
+            let mut min = rs.entites[adj_in[0]].level;
+            for a in adj_in.iter() {
+                let l = rs.entites[*a].level;
+                if l < min { min = l; }
+            }
+
+            let inc = match rt {
+                RelationType::Creator => 1,
+                RelationType::Invoker => -1,
+                _ => 0,
+            };
+            
+            if rs.entites[e].level != min+inc { panic!(); }
+        }
+    }
 
 }
