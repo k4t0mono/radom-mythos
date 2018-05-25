@@ -18,6 +18,8 @@ use std::io::prelude::*;
 use std::io;
 use docopt::Docopt;
 
+mod dot;
+mod description;
 mod test;
 
 pub fn write_file<'a>(data: &'a str, path: &'a str) {
@@ -44,25 +46,10 @@ fn read_file<'a>(path: &'a str) -> String {
 }
 
 
-trait Dot {
-	fn to_dot(&self) -> String;
-}
-
-
 #[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
 struct Entity {
 	name: String,
 	level: i32,
-}
-
-impl Dot for Entity {
-	fn to_dot(&self) -> String {
-		format!(
-			"{0} [label=\"{{ {0} | {1} }}\" color=\"#e9e9f4\" fontcolor=\"#e9e9f4\"]",
-			self.name,
-			self.level,
-		)
-	}
 }
 
 
@@ -76,7 +63,7 @@ enum RelationType {
 
 
 #[derive(Deserialize, Serialize)]
-struct Relations {
+pub struct Relations {
 	entites: Vec<Entity>,
 	relations: Vec<Vec<Option<RelationType>>>,
 }
@@ -218,7 +205,7 @@ impl Relations {
 
             if !adj_in.is_empty() { 
                 self.fix_levels(e, rt);
-                write_file(&self.to_dot(), &format!("fix_{:02}.dot", dots));
+                //write_file(&self.to_dot(), &format!("fix_{:02}.dot", dots));
                 dots += 1;
             }
 		}
@@ -280,64 +267,6 @@ impl Relations {
 
     // ========================================================================================
 
-	fn entity_description(&self, e: usize) -> String {
-		let get_names = |v: Vec<usize>| -> String {
-			let n = v.len();
-			let mut s: String = String::new();
-			
-			s += &self.entites[v[0]].name;
-
-			if n == 2 {
-				s += &format!(" and {}", &self.entites[v[1]].name);
-
-			} else if n > 2 {
-				for i in 1..n-1 {
-					s += &format!(", {}", &self.entites[v[i]].name);
-				}
-
-				s += &format!(" and {}", &self.entites[v[n-1]].name);
-			}
-
-			s
-		};
-
-
-		let mut s: String = format!("{}", self.entites[e].name);
-
-		let adj_in = self.adjacent_in(e);
-		if adj_in.len() == 0 {
-			s += " children of the Void";
-
-		} else {
-			let rt = self.relations[adj_in[0]][e].unwrap();
-
-			s += match rt {
-				RelationType::Invoker => " invoked by",
-				RelationType::Creator => " created by",
-				RelationType::Parent => " children of",
-				_ => "",
-			};
-
-			s += &format!(" {}", get_names(adj_in));
-		}
-
-		s += ".";
-		s
-	}
-
-	fn get_descriptions(&self) -> String {
-		let mut s: String = String::new();
-		let n = self.entites.len();
-
-		for i in 0..n-1 {
-			s += &format!("{}\n", self.entity_description(i));
-		}
-		s += &self.entity_description(n-1);
-
-		s
-	}
-
-
 	fn to_json(&self) -> String {
 		let j = serde_json::to_string_pretty(self).unwrap();
 
@@ -350,51 +279,6 @@ impl Relations {
 	}
 }
 
-impl Dot for Relations {
-	fn to_dot(&self) -> String {
-		let get_color = |rt: &RelationType| -> &str {
-			match rt {
-				&RelationType::Base => "#909090",
-				&RelationType::Invoker => "#ea51b2",
-				&RelationType::Creator => "#00f769",
-				&RelationType::Parent => "#62d6e8",
-			}
-		};
-
-		let relation_to_dot = |i: usize, j: usize, rt: &RelationType| -> String {
-			format!(
-				"{} -> {} [color=\"{}\"]",
-				self.entites[i].name,
-				self.entites[j].name,
-				get_color(rt),
-			)
-		};
-
-		let mut s: String = "digraph G {\n".to_string();
-		s += "\tgraph [bgcolor=\"#282936\"]\n";
-		s += "\tnode [shape=record style=rounded]\n\n";
-
-		for e in self.entites.iter() {
-			s += &format!("\t{}\n", e.to_dot());
-		}
-
-		s += "\n";
-
-		let n = self.entites.len();
-		for i in 0..n {
-			for j in 0..n {
-				match &self.relations[i][j] {
-					&Some(ref rt) => s += &format!("\t{}\n", relation_to_dot(i, j, rt)),
-					&None => (),
-				}
-			}
-		}
-
-		s += "}";
-
-		s
-	}
-}
 
 const USAGE: &'static str = "
 random-mythos
@@ -486,11 +370,11 @@ fn main() {
 	}
 
 	if args.flag_gen_dot {
-		write_file(&relations.to_dot(), "relations.dot");
+		write_file(&dot::relations_to_dot(&relations), "relations.dot");
 	}
 
-	let desc = relations.get_descriptions();
+	let desc = description::get_descriptions(&relations);
 	write_file(&desc, &args.arg_file);
 
-	println!("{}", relations.get_descriptions());
+	println!("{}", desc);
 }
