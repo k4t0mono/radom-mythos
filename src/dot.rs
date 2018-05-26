@@ -2,7 +2,7 @@
 
 use RelationType;
 use Entity;
-use Relations;
+use Mythos;
 
 fn entity_to_dot(entity: &Entity) -> String {
     format!(
@@ -13,7 +13,7 @@ fn entity_to_dot(entity: &Entity) -> String {
 }
 
 
-pub fn relations_to_dot(relations: &Relations) -> String {
+pub fn relations_to_dot(mythos: &Mythos) -> String {
     let get_color = |rt: &RelationType| -> &str {
         match rt {
             &RelationType::Base => "#909090",
@@ -26,8 +26,8 @@ pub fn relations_to_dot(relations: &Relations) -> String {
     let relation_to_dot = |i: usize, j: usize, rt: &RelationType| -> String {
         format!(
             "{} -> {} [color=\"{}\"]",
-            relations.entites[i].name,
-            relations.entites[j].name,
+            mythos.entites[i].name,
+            mythos.entites[j].name,
             get_color(rt),
         )
     };
@@ -36,16 +36,16 @@ pub fn relations_to_dot(relations: &Relations) -> String {
     s += "\tgraph [bgcolor=\"#282936\"]\n";
     s += "\tnode [shape=record style=rounded]\n\n";
 
-    for e in relations.entites.iter() {
+    for e in mythos.entites.iter() {
         s += &format!("\t{}\n", entity_to_dot(e));
     }
 
     s += "\n";
 
-    let n = relations.entites.len();
+    let n = mythos.entites.len();
     for i in 0..n {
         for j in 0..n {
-            match &relations.relations[i][j] {
+            match &mythos.relations[i][j] {
                 &Some(ref rt) => s += &format!("\t{}\n", relation_to_dot(i, j, rt)),
                 &None => (),
             }

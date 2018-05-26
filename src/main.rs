@@ -49,6 +49,10 @@ fn read_file<'a>(path: &'a str) -> String {
 #[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
 struct Entity {
 	name: String,
+
+	/* The base level is 0. The lower the level,
+	 * more powerful the entity is.
+	 */
 	level: i32,
 }
 
@@ -62,15 +66,21 @@ enum RelationType {
 }
 
 
+
 #[derive(Deserialize, Serialize)]
-pub struct Relations {
+pub struct Mythos {
 	entites: Vec<Entity>,
+
+	/* The relation between entities is modeled as a
+	 * directed acyclic graph (dag), and stored in an
+	 * adjacency matrix for simplicit.
+	 */
 	relations: Vec<Vec<Option<RelationType>>>,
 }
 
-impl Relations {
-	pub fn init(size: usize) -> Relations {
-        if size == 0 { panic!("Size must be grater then 0"); }
+impl Mythos {
+	pub fn init(size: usize) -> Mythos {
+		if size == 0 { panic!("Size must be grater then 0"); }
 
 		let mut entites: Vec<Entity> = vec![];
 		for i in 0..size {
@@ -82,11 +92,11 @@ impl Relations {
 
 		let relations: Vec<Vec<Option<RelationType>>> = vec![vec![None; size]; size];
 
-		Relations{ entites, relations }
+		Mythos{ entites, relations }
 	}
 
-	pub fn from_json(json: String) -> Relations {
-		let r: Relations = serde_json::from_str(&json).unwrap();
+	pub fn from_json(json: String) -> Mythos {
+		let r: Mythos = serde_json::from_str(&json).unwrap();
 
 		r
 	}
@@ -147,10 +157,11 @@ impl Relations {
 				trace!("New src: {}", src);
 			}
 
+			// It's not allowed to be a Philip J. Fry
+			debug!("Verifying cycles");
 			let mut stack: Vec<usize> = vec![];
 			let mut verif = vec![false; n];
 			stack.push(dest);
-			trace!("Verificando ciclos");
 			while let Some(top) = stack.pop() {
 				trace!("v: {}", top);
 
@@ -181,7 +192,6 @@ impl Relations {
 
 		info!("n relations: {}", n);
 
-        let mut dots = 1;
 		for e in 0..n {
 			info!("ent: {}", self.entites[e].name);
 			let adj_in = self.adjacent_in(e);
@@ -203,69 +213,66 @@ impl Relations {
 				self.relations[*src][e] = Some(rt);
 			}
 
-            if !adj_in.is_empty() { 
-                self.fix_levels(e, rt);
-                //write_file(&self.to_dot(), &format!("fix_{:02}.dot", dots));
-                dots += 1;
-            }
+			if !adj_in.is_empty() { self.fix_levels(e, rt); }
 		}
 	}
 
-    fn fix_levels(&mut self, i: usize, rt: RelationType) {
-        /* TODO
-         * - Melhorar menssagens de debug 
-         * - Verificar Creator
-         */
+	fn fix_levels(&mut self, i: usize, rt: RelationType) {
+		/* TODO
+		 * - Melhorar menssagens de debug 
+		 * - Verificar Creator
+		 * - Verificar quando abs(delta) > 1
+		 */
 
-        info!("Fixing levels");
+		info!("Fixing levels");
 
-        trace!("Fixing level of {:?}", self.entites[i].name);
-        let adj_in = self.adjacent_in(i);
-        trace!("adj_in: {:?}", adj_in);
-            
-        let mut min: i32 = self.entites[adj_in[0]].level;
-        for j in 1..adj_in.len() {
-            let l = self.entites[j].level;
-            if l < min { min = l; }
-        }
+		trace!("Fixing level of {:?}", self.entites[i].name);
+		let adj_in = self.adjacent_in(i);
+		trace!("adj_in: {:?}", adj_in);
+			
+		let mut min: i32 = self.entites[adj_in[0]].level;
+		for j in 1..adj_in.len() {
+			let l = self.entites[j].level;
+			if l < min { min = l; }
+		}
 
-        let inc = match rt {
-            RelationType::Invoker => -1,
-            RelationType::Creator => 1,
-            _ => 0,
-        };
+		let inc = match rt {
+			RelationType::Invoker => -1,
+			RelationType::Creator => 1,
+			_ => 0,
+		};
 
-        let new_level = min + inc;
-        let delta = new_level - self.entites[i].level;
+		let new_level = min + inc;
+		let delta = new_level - self.entites[i].level;
 
-        trace!("rt: {:?}", rt);
-        trace!("min: {}, inc: {}, l': {}, delta: {}", min, inc, new_level, delta);
+		trace!("rt: {:?}", rt);
+		trace!("min: {}, inc: {}, l': {}, delta: {}", min, inc, new_level, delta);
+		if delta == 0 { return; }
 
-        self.entites[i].level = new_level;
+		self.entites[i].level = new_level;
 
-        trace!("Propagate new value");
-        let mut queue: VecDeque<usize> = VecDeque::new();
-        for j in self.adjacent_out(i).iter() { queue.push_back(*j); }
-        while !queue.is_empty() {
-            let first = queue.pop_front().unwrap();
-            trace!("first: {:?}", first);
+		trace!("Propagate new value");
+		let mut queue: VecDeque<usize> = VecDeque::new();
+		for j in self.adjacent_out(i).iter() { queue.push_back(*j); }
+		while !queue.is_empty() {
+			let first = queue.pop_front().unwrap();
+			trace!("first: {:?}", first);
 
-            let nl = self.entites[first].level + inc;
-            if nl <= self.entites[first].level {
-                trace!("Negative delta, set new level to {}", nl);
-                self.entites[first].level = nl;
-                for out in self.adjacent_out(first).iter() {
-                    queue.push_back(*out);
-                }
+			let nl = self.entites[first].level + inc;
+			if nl == self.entites[first].level {
+				trace!("Same level, clear queue");
+				queue.clear();
+			}
 
-            } else {
-                trace!("Positive delta, sticking with the old one");
-                queue.clear();
-            }
-        }
-    }
+			trace!("Set new level to {}", nl);
+			self.entites[first].level = nl;
+			for out in self.adjacent_out(first).iter() {
+				queue.push_back(*out);
+			}
+		}
+	}
 
-    // ========================================================================================
+	// ========================================================================================
 
 	fn to_json(&self) -> String {
 		let j = serde_json::to_string_pretty(self).unwrap();
@@ -294,7 +301,7 @@ Options:
 	-d --gen-dot        Generate relations' graph dot file 
 	--verbose=<n>       Set log level
 	--export=<json>     Export relations to JSON file
-    --import=<json>     Import relations from JSON file
+	--import=<json>     Import relations from JSON file
 ";
 
 #[derive(Debug, Deserialize)]
@@ -303,7 +310,7 @@ struct Args {
 	flag_version: bool,
 	flag_gen_dot: bool,
 	flag_export: Option<String>,
-    flag_import: Option<String>,
+	flag_import: Option<String>,
 	arg_file: String,
 }
 
@@ -323,7 +330,7 @@ fn set_logger(level: usize) {
 	TermLogger::init(log_level, Config::default()).unwrap();
 }
 
-fn init_relations() -> Relations {
+fn init_mythos() -> Mythos {
 	print!("Number of entites to generate: ");
 	io::stdout().flush().unwrap();
 
@@ -336,10 +343,10 @@ fn init_relations() -> Relations {
 		Err(_) => panic!("Enter a number"),
 	};
 
-	let mut relations = Relations::init(num);
-	relations.generate();
+	let mut mythos = Mythos::init(num);
+	mythos.generate();
 
-    relations
+	mythos
 }
 
 fn main() {
@@ -357,23 +364,23 @@ fn main() {
 	info!("Random Mythos engage");
 	io::stdout().flush().unwrap();
 
-    let relations: Relations;
-    if args.flag_import.is_some() {
-        relations = Relations::from_json(read_file(&args.flag_import.unwrap()));
+	let mythos: Mythos;
+	if args.flag_import.is_some() {
+		mythos = Mythos::from_json(read_file(&args.flag_import.unwrap()));
 
-    } else {
-        relations = init_relations();
-    }
+	} else {
+		mythos = init_mythos();
+	}
 
 	if args.flag_export.is_some() {
-		write_file(&relations.to_json(), &args.flag_export.unwrap());
+		write_file(&mythos.to_json(), &args.flag_export.unwrap());
 	}
 
 	if args.flag_gen_dot {
-		write_file(&dot::relations_to_dot(&relations), "relations.dot");
+		write_file(&dot::relations_to_dot(&mythos), "relations.dot");
 	}
 
-	let desc = description::get_descriptions(&relations);
+	let desc = description::get_descriptions(&mythos);
 	write_file(&desc, &args.arg_file);
 
 	println!("{}", desc);
