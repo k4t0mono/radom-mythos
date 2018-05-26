@@ -11,11 +11,12 @@ extern crate serde_json;
 extern crate serde_derive;
 extern crate docopt;
 
-use rand::Rng;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
 use std::io;
 use docopt::Docopt;
+
+mod relations;
 
 mod dot;
 mod description;
@@ -46,35 +47,20 @@ fn read_file<'a>(path: &'a str) -> String {
 
 
 #[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
-struct Entity {
+pub struct Entity {
 	name: String,
 
 	/* The base level is 0. The lower the level,
 	 * more powerful the entity is.
 	 */
-	level: i32,
+	level: i8,
 }
-
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Deserialize, Serialize)]
-enum RelationType {
-	Base,
-	Parent,
-	Invoker,
-	Creator,
-}
-
 
 
 #[derive(Deserialize, Serialize)]
 pub struct Mythos {
 	entites: Vec<Entity>,
-
-	/* The relation between entities is modeled as a
-	 * directed acyclic graph (dag), and stored in an
-	 * adjacency matrix for simplicit.
-	 */
-	relations: Vec<Vec<Option<RelationType>>>,
+	relations: relations::Relations,
 }
 
 impl Mythos {
@@ -89,169 +75,20 @@ impl Mythos {
 			});
 		}
 
-		let relations: Vec<Vec<Option<RelationType>>> = vec![vec![None; size]; size];
+		let relations = relations::Relations::new(size);
 
 		Mythos{ entites, relations }
 	}
 
-	pub fn from_json(json: String) -> Mythos {
-		let r: Mythos = serde_json::from_str(&json).unwrap();
-
-		r
-	}
-
-	fn add(&mut self, source: usize, destiny: usize, rt : RelationType) {
-		self.relations[source][destiny] = Some(rt);
-	}
-
-	fn adjacent_out(&self, vertex: usize) -> Vec<usize> {
-		let mut v: Vec<usize> = vec![];
-		
-		for j in 0..self.entites.len() {
-			match &self.relations[vertex][j] {
-				&Some(_) => v.push(j),
-				&None => (),
-			}
-		}
-
-		v
-	}
-
-	fn adjacent_in(&self, vertex: usize) -> Vec<usize> {
-		let mut v: Vec<usize> = vec![];
-		
-		for i in 0..self.entites.len() {
-			match &self.relations[i][vertex] {
-				&Some(_) => v.push(i),
-				&None => (),
-			}
-		}
-
-		v
-	}
-
-	fn topological_sort(&self) -> Vec<usize> {
-
-		let mut list: Vec<usize> = vec![];
-
-		let n = self.entites.len();
-		let mut visited: Vec<bool> = vec![false; n];
-		for i in 0..n {
-			if visited[i] { continue; }
-			self.topological_sort_visit(i, &mut visited, &mut list);
-		}
-		
-		let mut sorted: Vec<usize> = vec![];
-		while let Some(top) = list.pop() { sorted.push(top); }
-
-		sorted
-	}
-
-	fn topological_sort_visit(&self, n: usize, visited: &mut Vec<bool>, stack: &mut Vec<usize>) {
-		if visited[n] { return; }
-
-		for i in self.adjacent_out(n).iter() {
-			self.topological_sort_visit(*i, visited, stack);
-		}
-
-		visited[n] = true;
-		stack.push(n);
-	}
-
-	//===============================================================
-
-	fn generate_base_relation(&mut self) {
-		let s = self.entites.len();
-		trace!("self.entites: {}", s);
-
-		let n = s as usize;
-		let mut n_gem = n;
-		if n < 5 { n_gem -= 1; }
-		trace!("num relations: {}", n);
-
-		for _i in 0..n_gem {
-			let mut src = rand::thread_rng().gen_range(0, s);
-			let mut dest = rand::thread_rng().gen_range(0, s);
-			trace!("src: {:?}, dest: {:?}", src, dest);
-			
-			while src == dest  {
-				trace!("I can't be my own src");
-				dest = rand::thread_rng().gen_range(0, s);
-				trace!("New dest: {}", dest);
-			}
-			
-			while let &Some(ref _rt) = &self.relations[src][dest] {
-				trace!("You already are the src");
-				src = rand::thread_rng().gen_range(0, s);
-				trace!("New src: {}", src);
-			}
-
-			// It's not allowed to be a Philip J. Fry
-			debug!("Verifying cycles");
-			let mut stack: Vec<usize> = vec![];
-			let mut verif = vec![false; n];
-			stack.push(dest);
-			while let Some(top) = stack.pop() {
-				trace!("v: {}", top);
-
-				if verif[top] || top == src {
-					trace!("A cicle identifyed");
-
-					stack.clear();
-					verif = vec![false; n];
-					dest = rand::thread_rng().gen_range(0, s);
-					stack.push(dest);
-
-					trace!("New dest: {}",dest);
-
-				} else {
-					verif[top] = true;
-					let adj = self.adjacent_out(top);
-					for i in adj.iter() { stack.push(*i); }
-				}
-			}
-
-			info!("src: {:?}, dest: {:?}", src, dest);
-			self.add(src, dest, RelationType::Base);
-		}
-	}
-
-	fn generate_relations(&mut self) {
-		let n = self.entites.len();
-
-		info!("n relations: {}", n);
-
-		for e in 0..n {
-			info!("ent: {}", self.entites[e].name);
-			let adj_in = self.adjacent_in(e);
-			trace!("adj_in: {:?}", adj_in);
-
-			let rt_n = rand::thread_rng().gen_range(0, 3);
-
-			let rt: RelationType = match rt_n {
-				0 => RelationType::Parent,
-				1 => RelationType::Invoker,
-				2 => RelationType::Creator,
-				
-				_ => panic!("Help"),
-			};
-
-			info!("rt: {:?}", rt);
-			for src in adj_in.iter() {
-				trace!("src {}", src);
-				self.relations[*src][e] = Some(rt);
-			}
-		}
-	}
-
 	fn fix_levels(&mut self) {
+        use relations::RelationType;
 		info!("fix_levels_toplogical");
 
-		let vertex = self.topological_sort();
+		let vertex = self.relations.get_topological_sort();
 		debug!("topological_sort: {:?}", vertex);
 		for i in vertex.iter() {
 			trace!("fixing {}", *i);
-			let adj_in = self.adjacent_in(*i);
+			let adj_in = self.relations.get_adj_in(*i);
 			if adj_in.is_empty() { continue; }
 
 			let mut s = "[".to_string();
@@ -262,8 +99,8 @@ impl Mythos {
 			trace!("adj_in: {}", s);
 
 
-			let rt = self.relations[adj_in[0]][*i].unwrap();
-			let mut min: i32 = self.entites[adj_in[0]].level;
+			let rt = self.relations.get_relation(adj_in[0], *i).unwrap();
+			let mut min = self.entites[adj_in[0]].level;
 			for j in adj_in.iter() {
 				let l = self.entites[*j].level;
 				if l < min { min = l; }
@@ -286,7 +123,11 @@ impl Mythos {
 		}
 	}
 
-	// ========================================================================================
+	pub fn from_json(json: String) -> Mythos {
+		let r: Mythos = serde_json::from_str(&json).unwrap();
+
+		r
+	}
 
 	fn to_json(&self) -> String {
 		let j = serde_json::to_string_pretty(self).unwrap();
@@ -295,9 +136,8 @@ impl Mythos {
 	}
 
 	fn generate(&mut self) {
-		self.generate_base_relation();
-		self.generate_relations();
-		self.fix_levels();
+        self.relations.generate();
+        self.fix_levels();
 	}
 }
 
@@ -311,12 +151,12 @@ Usage:
 	random-mythos (-v | --version)
 
 Options:
-	-h --help			Show this screen
-	-v --version		Show version
-	-d --gen-dot		Generate relations' graph dot file 
-	--verbose=<n>		Set log level
-	--export=<json>		Export relations to JSON file
-	--import=<json>		Import relations from JSON file
+	-h --help           Show this screen
+	-v --version        Show version
+	-d --gen-dot        Generate relations' graph dot file 
+	--verbose=<n>       Set log level
+	--export=<json>     Export relations to JSON file
+	--import=<json>     Import relations from JSON file
 ";
 
 #[derive(Debug, Deserialize)]
