@@ -12,7 +12,6 @@ extern crate serde_derive;
 extern crate docopt;
 
 use rand::Rng;
-use std::collections::VecDeque;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
 use std::io;
@@ -131,6 +130,36 @@ impl Mythos {
 		v
 	}
 
+	fn topological_sort(&self) -> Vec<usize> {
+
+		let mut list: Vec<usize> = vec![];
+
+		let n = self.entites.len();
+		let mut visited: Vec<bool> = vec![false; n];
+		for i in 0..n {
+			if visited[i] { continue; }
+			self.topological_sort_visit(i, &mut visited, &mut list);
+		}
+		
+		let mut sorted: Vec<usize> = vec![];
+		while let Some(top) = list.pop() { sorted.push(top); }
+
+		sorted
+	}
+
+	fn topological_sort_visit(&self, n: usize, visited: &mut Vec<bool>, stack: &mut Vec<usize>) {
+		if visited[n] { return; }
+
+		for i in self.adjacent_out(n).iter() {
+			self.topological_sort_visit(*i, visited, stack);
+		}
+
+		visited[n] = true;
+		stack.push(n);
+	}
+
+	//===============================================================
+
 	fn generate_base_relation(&mut self) {
 		let s = self.entites.len();
 		trace!("self.entites: {}", s);
@@ -212,63 +241,48 @@ impl Mythos {
 				trace!("src {}", src);
 				self.relations[*src][e] = Some(rt);
 			}
-
-			if !adj_in.is_empty() { self.fix_levels(e, rt); }
 		}
 	}
 
-	fn fix_levels(&mut self, i: usize, rt: RelationType) {
-		/* TODO
-		 * - Melhorar menssagens de debug 
-		 * - Verificar Creator
-		 * - Verificar quando abs(delta) > 1
-		 */
+	fn fix_levels(&mut self) {
+		info!("fix_levels_toplogical");
 
-		info!("Fixing levels");
+		let vertex = self.topological_sort();
+		debug!("topological_sort: {:?}", vertex);
+		for i in vertex.iter() {
+			trace!("fixing {}", *i);
+			let adj_in = self.adjacent_in(*i);
+			if adj_in.is_empty() { continue; }
 
-		trace!("Fixing level of {:?}", self.entites[i].name);
-		let adj_in = self.adjacent_in(i);
-		trace!("adj_in: {:?}", adj_in);
-			
-		let mut min: i32 = self.entites[adj_in[0]].level;
-		for j in 1..adj_in.len() {
-			let l = self.entites[j].level;
-			if l < min { min = l; }
-		}
+			let mut s = "[".to_string();
+			for j in adj_in.iter() {
+				s += &format!("({},{}), ", *j, self.entites[*j].level);
+			}
+			s += "]";
+			trace!("adj_in: {}", s);
 
-		let inc = match rt {
-			RelationType::Invoker => -1,
-			RelationType::Creator => 1,
-			_ => 0,
-		};
 
-		let new_level = min + inc;
-		let delta = new_level - self.entites[i].level;
-
-		trace!("rt: {:?}", rt);
-		trace!("min: {}, inc: {}, l': {}, delta: {}", min, inc, new_level, delta);
-		if delta == 0 { return; }
-
-		self.entites[i].level = new_level;
-
-		trace!("Propagate new value");
-		let mut queue: VecDeque<usize> = VecDeque::new();
-		for j in self.adjacent_out(i).iter() { queue.push_back(*j); }
-		while !queue.is_empty() {
-			let first = queue.pop_front().unwrap();
-			trace!("first: {:?}", first);
-
-			let nl = self.entites[first].level + inc;
-			if nl == self.entites[first].level {
-				trace!("Same level, clear queue");
-				queue.clear();
+			let rt = self.relations[adj_in[0]][*i].unwrap();
+			let mut min: i32 = self.entites[adj_in[0]].level;
+			for j in adj_in.iter() {
+				let l = self.entites[*j].level;
+				if l < min { min = l; }
 			}
 
-			trace!("Set new level to {}", nl);
-			self.entites[first].level = nl;
-			for out in self.adjacent_out(first).iter() {
-				queue.push_back(*out);
-			}
+			let inc = match rt {
+				RelationType::Invoker => -1,
+				RelationType::Creator => 1,
+				_ => 0,
+			};
+
+			let new_level = min + inc;
+			let delta = new_level - self.entites[*i].level;
+
+			trace!("rt: {:?}", rt);
+			trace!("min: {}, inc: {}, l': {}, delta: {}", min, inc, new_level, delta);
+			if delta == 0 { continue; }
+
+			self.entites[*i].level = new_level;
 		}
 	}
 
@@ -283,6 +297,7 @@ impl Mythos {
 	fn generate(&mut self) {
 		self.generate_base_relation();
 		self.generate_relations();
+		self.fix_levels();
 	}
 }
 
@@ -296,12 +311,12 @@ Usage:
 	random-mythos (-v | --version)
 
 Options:
-	-h --help           Show this screen
-	-v --version        Show version
-	-d --gen-dot        Generate relations' graph dot file 
-	--verbose=<n>       Set log level
-	--export=<json>     Export relations to JSON file
-	--import=<json>     Import relations from JSON file
+	-h --help			Show this screen
+	-v --version		Show version
+	-d --gen-dot		Generate relations' graph dot file 
+	--verbose=<n>		Set log level
+	--export=<json>		Export relations to JSON file
+	--import=<json>		Import relations from JSON file
 ";
 
 #[derive(Debug, Deserialize)]
@@ -363,7 +378,7 @@ fn main() {
 
 	info!("Random Mythos engage");
 	io::stdout().flush().unwrap();
-
+	
 	let mythos: Mythos;
 	if args.flag_import.is_some() {
 		mythos = Mythos::from_json(read_file(&args.flag_import.unwrap()));
