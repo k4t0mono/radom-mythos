@@ -47,6 +47,16 @@ impl Relations {
         self.topological_sort()
     }
 
+    pub fn get_roots(&self) -> Vec<usize> {
+        let mut roots: Vec<usize> = vec![];
+
+        for i in 0..self.size {
+            if self.adjacent_in(i).is_empty() { roots.push(i); }
+        }
+
+        roots
+    }
+
     // =================================================================
 
 	fn adjacent_out(&self, vertex: usize) -> Vec<usize> {

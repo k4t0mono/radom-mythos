@@ -17,6 +17,7 @@ use std::io;
 use docopt::Docopt;
 
 mod relations;
+mod domains;
 
 mod dot;
 mod description;
@@ -47,13 +48,14 @@ fn read_file<'a>(path: &'a str) -> String {
 
 
 #[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
-pub struct Entity {
+struct Entity {
 	name: String,
 
 	/* The base level is 0. The lower the level,
 	 * more powerful the entity is.
 	 */
 	level: i8,
+    domain: domains::Domain,
 }
 
 
@@ -72,12 +74,31 @@ impl Mythos {
 			entites.push(Entity{
 				name: format!("ent{:02}", i),
 				level: 0,
+                domain: domains::Domain::new(),
 			});
 		}
 
 		let relations = relations::Relations::new(size);
 
 		Mythos{ entites, relations }
+	}
+
+	pub fn from_json(json: String) -> Mythos {
+		let r: Mythos = serde_json::from_str(&json).unwrap();
+
+		r
+	}
+
+	fn to_json(&self) -> String {
+		let j = serde_json::to_string_pretty(self).unwrap();
+
+		j
+	}
+
+	fn generate(&mut self) {
+        self.relations.generate();
+        self.fix_levels();
+        self.generate_domains();
 	}
 
 	fn fix_levels(&mut self) {
@@ -122,23 +143,17 @@ impl Mythos {
 			self.entites[*i].level = new_level;
 		}
 	}
-
-	pub fn from_json(json: String) -> Mythos {
-		let r: Mythos = serde_json::from_str(&json).unwrap();
-
-		r
-	}
-
-	fn to_json(&self) -> String {
-		let j = serde_json::to_string_pretty(self).unwrap();
-
-		j
-	}
-
-	fn generate(&mut self) {
-        self.relations.generate();
-        self.fix_levels();
-	}
+    
+    fn generate_domains(&mut self) {
+        info!("Generate domains");
+        
+        for i in self.relations.get_roots().iter() {
+            self.entites[*i].domain = domains::Domain::gen_domain();
+        }
+        // TODO: Fazer o código de cross-over
+        
+        // println!("{:?}", domains::Domain::gen_domain());
+    }
 }
 
 
@@ -239,4 +254,8 @@ fn main() {
 	write_file(&desc, &args.arg_file);
 
 	println!("{}", desc);
+
+    for e in mythos.entites.iter() {
+        println!("{:?}", *e);
+    }
 }

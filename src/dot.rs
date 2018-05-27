@@ -1,14 +1,31 @@
 // Dot related functions
 
+use domains::Domain;
 use relations::RelationType;
 use Entity;
 use Mythos;
 
+const NODE_COLORS: &'static str = "color=\"#e9e9f4\" fontcolor=\"#e9e9f4\""; 
+
+
+fn domain_to_dot(domain: &Domain) -> String {
+    format!(
+        "{{ 🜄{:02x} 🜃{:02x} | 🜂{:02x} 🜁{:02x} }}",
+        domain.get_water(),
+        domain.get_earth(),
+        domain.get_fire(),
+        domain.get_air(),
+    )
+}
+
+
 fn entity_to_dot(entity: &Entity) -> String {
 	format!(
-		"{0} [label=\"{{ {0} | {1} }}\" color=\"#e9e9f4\" fontcolor=\"#e9e9f4\"]",
+		"{0} [label=\"{{ {0} | {{ {1} | {2} }} }}\" {3}]",
 		entity.name,
 		entity.level,
+        domain_to_dot(&entity.domain),
+        NODE_COLORS,
 	)
 }
 
