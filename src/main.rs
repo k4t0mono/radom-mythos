@@ -55,7 +55,7 @@ struct Entity {
 	 * more powerful the entity is.
 	 */
 	level: i8,
-    domain: domains::Domain,
+	domain: domains::Domain,
 }
 
 
@@ -74,7 +74,7 @@ impl Mythos {
 			entites.push(Entity{
 				name: format!("ent{:02}", i),
 				level: 0,
-                domain: domains::Domain::new(),
+				domain: domains::Domain::new(),
 			});
 		}
 
@@ -96,13 +96,13 @@ impl Mythos {
 	}
 
 	fn generate(&mut self) {
-        self.relations.generate();
-        self.fix_levels();
-        self.generate_domains();
+		self.relations.generate();
+		self.fix_levels();
+		self.generate_domains();
 	}
 
 	fn fix_levels(&mut self) {
-        use relations::RelationType;
+		use relations::RelationType;
 		info!("fix_levels_toplogical");
 
 		let vertex = self.relations.get_topological_sort();
@@ -120,7 +120,7 @@ impl Mythos {
 			trace!("adj_in: {}", s);
 
 
-			let rt = self.relations.get_relation(adj_in[0], *i).unwrap();
+			let rt = self.relations.get(adj_in[0], *i).unwrap();
 			let mut min = self.entites[adj_in[0]].level;
 			for j in adj_in.iter() {
 				let l = self.entites[*j].level;
@@ -143,17 +143,46 @@ impl Mythos {
 			self.entites[*i].level = new_level;
 		}
 	}
-    
-    fn generate_domains(&mut self) {
-        info!("Generate domains");
-        
-        for i in self.relations.get_roots().iter() {
-            self.entites[*i].domain = domains::Domain::gen_domain();
-        }
-        // TODO: Fazer o código de cross-over
-        
-        // println!("{:?}", domains::Domain::gen_domain());
-    }
+	
+	fn generate_domains(&mut self) {
+		use relations::RelationType;
+		info!("Generate domains");
+		
+		for i in self.relations.get_roots().iter() {
+			self.entites[*i].domain = domains::Domain::gen_domain();
+		}
+
+		for i in 0..self.entites.len() {
+			let adj_in = self.relations.get_adj_in(i);
+			if adj_in.is_empty() { continue; }
+			trace!("Trying {}", i);
+
+			let rt = self.relations.get(adj_in[0], i).unwrap();
+
+			if rt == RelationType::Creator {
+				trace!("I found a Creator type");
+
+				if adj_in.len() == 1 {
+					trace!("I'm children of a single");
+
+					self.entites[i].domain = self.entites[adj_in[0]].domain.mutate();
+
+				} else {
+					trace!("I have many parents");
+
+					let mut d = self.entites[adj_in[0]].domain.clone();
+					for j in 1..adj_in.len() {
+						trace!("cross_over {}", j);
+
+						d = d.cross_over(&self.entites[adj_in[j]].domain).mutate();
+					}
+
+					self.entites[i].domain = d;
+				}
+
+			}
+		}
+	}
 }
 
 
@@ -166,12 +195,12 @@ Usage:
 	random-mythos (-v | --version)
 
 Options:
-	-h --help           Show this screen
-	-v --version        Show version
-	-d --gen-dot        Generate relations' graph dot file 
-	--verbose=<n>       Set log level
-	--export=<json>     Export relations to JSON file
-	--import=<json>     Import relations from JSON file
+    -h --help           Show this screen
+    -v --version        Show version
+    -d --gen-dot        Generate relations' graph dot file 
+    --verbose=<n>       Set log level
+    --export=<json>     Export relations to JSON file
+    --import=<json>     Import relations from JSON file
 ";
 
 #[derive(Debug, Deserialize)]
@@ -233,7 +262,7 @@ fn main() {
 
 	info!("Random Mythos engage");
 	io::stdout().flush().unwrap();
-	
+
 	let mythos: Mythos;
 	if args.flag_import.is_some() {
 		mythos = Mythos::from_json(read_file(&args.flag_import.unwrap()));
@@ -255,7 +284,7 @@ fn main() {
 
 	println!("{}", desc);
 
-    for e in mythos.entites.iter() {
-        println!("{:?}", *e);
-    }
+	for e in mythos.entites.iter() {
+		println!("{:?}", *e);
+	}
 }

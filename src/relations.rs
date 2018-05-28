@@ -35,7 +35,7 @@ impl Relations {
 		self.generate_relations();
 	}
 
-	pub fn get_relation(&self, i: usize, j: usize) -> Option<RelationType> {
+	pub fn get(&self, i: usize, j: usize) -> Option<RelationType> {
 		self.data[i][j]
 	}
 
@@ -43,21 +43,21 @@ impl Relations {
 		self.adjacent_in(vertex)
 	}
 
-    pub fn get_topological_sort(&self) -> Vec<usize> {
-        self.topological_sort()
-    }
+	pub fn get_topological_sort(&self) -> Vec<usize> {
+		self.topological_sort()
+	}
 
-    pub fn get_roots(&self) -> Vec<usize> {
-        let mut roots: Vec<usize> = vec![];
+	pub fn get_roots(&self) -> Vec<usize> {
+		let mut roots: Vec<usize> = vec![];
 
-        for i in 0..self.size {
-            if self.adjacent_in(i).is_empty() { roots.push(i); }
-        }
+		for i in 0..self.size {
+			if self.adjacent_in(i).is_empty() { roots.push(i); }
+		}
 
-        roots
-    }
+		roots
+	}
 
-    // =================================================================
+	// =================================================================
 
 	fn adjacent_out(&self, vertex: usize) -> Vec<usize> {
 		let mut v: Vec<usize> = vec![];

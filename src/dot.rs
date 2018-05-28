@@ -9,13 +9,13 @@ const NODE_COLORS: &'static str = "color=\"#e9e9f4\" fontcolor=\"#e9e9f4\"";
 
 
 fn domain_to_dot(domain: &Domain) -> String {
-    format!(
-        "{{ 🜄{:02x} 🜃{:02x} | 🜂{:02x} 🜁{:02x} }}",
-        domain.get_water(),
-        domain.get_earth(),
-        domain.get_fire(),
-        domain.get_air(),
-    )
+	format!(
+		"{{ 🜄{:02x} 🜃{:02x} | 🜂{:02x} 🜁{:02x} }}",
+		domain.get_water(),
+		domain.get_earth(),
+		domain.get_fire(),
+		domain.get_air(),
+	)
 }
 
 
@@ -24,8 +24,8 @@ fn entity_to_dot(entity: &Entity) -> String {
 		"{0} [label=\"{{ {0} | {{ {1} | {2} }} }}\" {3}]",
 		entity.name,
 		entity.level,
-        domain_to_dot(&entity.domain),
-        NODE_COLORS,
+		domain_to_dot(&entity.domain),
+		NODE_COLORS,
 	)
 }
 
@@ -62,7 +62,7 @@ pub fn relations_to_dot(mythos: &Mythos) -> String {
 	let n = mythos.entites.len();
 	for i in 0..n {
 		for j in 0..n {
-			match &mythos.relations.get_relation(i, j) {
+			match &mythos.relations.get(i, j) {
 				&Some(ref rt) => s += &format!("\t{}\n", relation_to_dot(i, j, rt)),
 				&None => (),
 			}
