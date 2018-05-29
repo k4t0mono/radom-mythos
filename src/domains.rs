@@ -31,6 +31,18 @@ impl DomainType {
 			&DomainType::Air => DomainType::Fire,
 		}
 	}
+
+	pub fn get_name(&self) -> String {
+		let mut s = String::new();
+		s += match self {
+			&DomainType::Water => "Water",
+			&DomainType::Earth => "Earth",
+			&DomainType::Fire => "Fire",
+			&DomainType::Air => "Air",
+		};
+
+		s
+	}
 }
 
 
@@ -57,17 +69,29 @@ impl Domain {
 		d
 	}
 
-	pub fn get_water(&self) -> &u8 { self.values.get(&DomainType::Water).unwrap() }
+	pub fn get(&self, dt: DomainType) -> &u8 { self.values.get(&dt).unwrap() }
 
-	pub fn get_earth(&self) -> &u8 { self.values.get(&DomainType::Earth).unwrap() }
+	pub fn get_values(&self) -> Vec<(DomainType, u8)> {
+		let mut list: Vec<(DomainType, u8)> = vec![];
 
-	pub fn get_fire(&self) -> &u8 { self.values.get(&DomainType::Fire).unwrap() }
+		for (k, v) in &self.values { list.push((*k, *v)); }
 
-	pub fn get_air(&self) -> &u8 { self.values.get(&DomainType::Air).unwrap() }
+		list
+	}
 
-	pub fn get_primary(&self) -> &Option<DomainType> { &self.primary }
+	pub fn get_primary(&self) -> Option<(DomainType, u8)> {
+		if self.primary.is_none() { return None; }
 
-	pub fn get_secundary(&self) -> &Option<DomainType> { &self.secundary }
+		let pri = self.primary.unwrap();
+		Some(( pri, *self.values.get(&pri).unwrap() ))
+	}
+
+	pub fn get_secundary(&self) -> Option<(DomainType, u8)> {
+		if self.secundary.is_none() { return None; }
+
+		let pri = self.secundary.unwrap();
+		Some(( pri, *self.values.get(&pri).unwrap() ))
+	}
 
 	pub fn gen_domain() -> Domain {
 		debug!("gen_domain");
@@ -85,8 +109,6 @@ impl Domain {
 		let pri_l = rand::thread_rng().gen_range(127, 255);
 		d.primary = Some(pri_d);
 		d.values.insert(pri_d, pri_l);
-		println!("primary: {:?}", (pri_d, pri_l));
-
 
 		let sec_dn = rand::thread_rng().gen_range(0, 1);
 		let sec_d: DomainType;
@@ -178,6 +200,32 @@ impl Domain {
 			new_d.values.insert(*k, new_v);
 		}
 
+		new_d.set_primary_secundary();
+
+		new_d
+	}
+
+	pub fn gen_from_average(list: Vec<Domain>) -> Domain {
+		info!("gen_from_average");
+
+		let mut new_d = Domain::new();
+
+		let n = list.len();
+		debug!("n: {}", n);
+
+		let mut values: HashMap<DomainType, usize> = HashMap::new();
+		for i in 0..n {
+			for (k, v) in &list[i].values {
+				let v0 = values.entry(*k).or_insert(0);
+				*v0 += *v as usize;
+			}
+		}
+
+		if n == 1 { println!("aaaa: {:?}", list); }
+		for (k, v) in &values { 
+			new_d.values.insert(*k, (v/n) as u8);
+			trace!("new value: ({:?} , {:?})", *k, new_d.values.get(k).unwrap());
+		}
 		new_d.set_primary_secundary();
 
 		new_d

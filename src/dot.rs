@@ -1,6 +1,6 @@
 // Dot related functions
 
-use domains::Domain;
+use domains::*;
 use relations::RelationType;
 use Entity;
 use Mythos;
@@ -11,10 +11,10 @@ const NODE_COLORS: &'static str = "color=\"#e9e9f4\" fontcolor=\"#e9e9f4\"";
 fn domain_to_dot(domain: &Domain) -> String {
 	format!(
 		"{{ 🜄{:02x} 🜃{:02x} | 🜂{:02x} 🜁{:02x} }}",
-		domain.get_water(),
-		domain.get_earth(),
-		domain.get_fire(),
-		domain.get_air(),
+		domain.get(DomainType::Water),
+		domain.get(DomainType::Earth),
+		domain.get(DomainType::Fire),
+		domain.get(DomainType::Air),
 	)
 }
 

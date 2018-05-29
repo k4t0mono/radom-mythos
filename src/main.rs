@@ -42,7 +42,7 @@ fn read_file<'a>(path: &'a str) -> String {
 
 	let mut data = String::new();
 	f.read_to_string(&mut data).unwrap();
-	
+
 	data
 }
 
@@ -143,11 +143,14 @@ impl Mythos {
 			self.entites[*i].level = new_level;
 		}
 	}
-	
+
 	fn generate_domains(&mut self) {
+		use rand::Rng;
 		use relations::RelationType;
+		use domains::Domain;
+
 		info!("Generate domains");
-		
+
 		for i in self.relations.get_roots().iter() {
 			self.entites[*i].domain = domains::Domain::gen_domain();
 		}
@@ -155,20 +158,20 @@ impl Mythos {
 		for i in 0..self.entites.len() {
 			let adj_in = self.relations.get_adj_in(i);
 			if adj_in.is_empty() { continue; }
-			trace!("Trying {}", i);
+			debug!("Trying {}", i);
 
 			let rt = self.relations.get(adj_in[0], i).unwrap();
 
-			if rt == RelationType::Creator {
-				trace!("I found a Creator type");
+			if rt == RelationType::Parent {
+				trace!("I found a Parent type");
 
 				if adj_in.len() == 1 {
-					trace!("I'm children of a single");
+					debug!("I'm children of a single");
 
 					self.entites[i].domain = self.entites[adj_in[0]].domain.mutate();
 
 				} else {
-					trace!("I have many parents");
+					debug!("I have many parents");
 
 					let mut d = self.entites[adj_in[0]].domain.clone();
 					for j in 1..adj_in.len() {
@@ -180,6 +183,29 @@ impl Mythos {
 					self.entites[i].domain = d;
 				}
 
+			} else if rt == RelationType::Creator {
+				debug!("I found a Creator type");
+
+				let mut ds: Vec<Domain> = vec![];
+				for k in adj_in.iter() { ds.push(self.entites[*k].domain.clone()); }
+
+				self.entites[i].domain = Domain::gen_from_average(ds).mutate();
+
+			} else if rt == RelationType::Invoker {
+				debug!("I found a Invoker type");
+
+				if rand::thread_rng().gen_bool(0.7) {
+					debug!("The invokation worked");
+
+					let mut ds: Vec<Domain> = vec![];
+					for k in adj_in.iter() { ds.push(self.entites[*k].domain.clone()); }
+					self.entites[i].domain = Domain::gen_from_average(ds).mutate();
+
+				} else {
+					debug!("The invokation failed");
+
+					self.entites[i].domain = Domain::gen_domain().mutate();
+				}
 			}
 		}
 	}
@@ -190,14 +216,14 @@ const USAGE: &'static str = "
 random-mythos
 
 Usage:
-	random-mythos [options] <file>
-	random-mythos (-h | --help)
-	random-mythos (-v | --version)
+    random-mythos [options] <file>
+    random-mythos (-h | --help)
+    random-mythos (-v | --version)
 
 Options:
     -h --help           Show this screen
     -v --version        Show version
-    -d --gen-dot        Generate relations' graph dot file 
+    -d --gen-dot        Generate relations' graph dot file
     --verbose=<n>       Set log level
     --export=<json>     Export relations to JSON file
     --import=<json>     Import relations from JSON file
@@ -283,8 +309,4 @@ fn main() {
 	write_file(&desc, &args.arg_file);
 
 	println!("{}", desc);
-
-	for e in mythos.entites.iter() {
-		println!("{:?}", *e);
-	}
 }

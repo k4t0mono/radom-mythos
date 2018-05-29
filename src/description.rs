@@ -25,25 +25,22 @@ fn get_names(mythos: &Mythos, v: Vec<usize>) -> String {
 }
 
 fn get_entity_domain(domain: &Domain) -> String {
-	let mut s = "master of ".to_string();
-
-	s += match domain.get_primary().unwrap() {
-		DomainType::Water => "water",
-		DomainType::Earth => "earth",
-		DomainType::Fire => "fire",
-		DomainType::Air => "air",
+	let get_title = |level: u8| -> &'static str {
+		if (level > 0) && (level <= 63) { return "novice"; }
+		else if (level > 63) && (level <= 127) { return "studant"; }
+		else if (level > 127) && (level <= 189) { return "apprentice"; }
+		else { return "master"; }
 	};
 
-	s += " and ";
-
-	s += match domain.get_secundary().unwrap() {
-		DomainType::Water => "water",
-		DomainType::Earth => "earth",
-		DomainType::Fire => "fire",
-		DomainType::Air => "air",
-	};
-
-	s
+	let pri = domain.get_primary().unwrap();
+	let sec = domain.get_secundary().unwrap();
+	format!(
+		"{} of {} and {} of {}",
+		get_title(pri.1),
+		pri.0.get_name(),
+		get_title(sec.1),
+		sec.0.get_name(),
+	)
 }
 
 // TODO: Passar ref para entidade
