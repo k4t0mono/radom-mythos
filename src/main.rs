@@ -101,26 +101,28 @@ impl Mythos {
 		self.generate_domains();
 	}
 
+	/* The levels are fixed following the topological order to avoid propagation
+	 * of a wrong level, and to not access all children nodes every time a
+	 * parent node is changed.
+	 *
+	 * Ajust the entity level according the following rules:
+	 * - A invoked entity must be one level below the stronger invoker
+	 * - A children entity must be the same level as the strogest parent
+	 * - A created entity must be one level above the stronger creator
+	 */
 	fn fix_levels(&mut self) {
 		use relations::RelationType;
 		info!("fix_levels_toplogical");
 
-		let vertex = self.relations.get_topological_sort();
-		debug!("topological_sort: {:?}", vertex);
-		for i in vertex.iter() {
-			trace!("fixing {}", *i);
-			let adj_in = self.relations.get_adj_in(*i);
+		let entites = self.relations.get_topological_sort();
+		debug!("topological_sort: {:?}", entites);
+		for entity in entites.iter() {
+			trace!("fixing {}", *entity);
+			let adj_in = self.relations.get_adj_in(*entity);
+			trace!("adj_in: {}", adj_in);
 			if adj_in.is_empty() { continue; }
 
-			let mut s = "[".to_string();
-			for j in adj_in.iter() {
-				s += &format!("({},{}), ", *j, self.entites[*j].level);
-			}
-			s += "]";
-			trace!("adj_in: {}", s);
-
-
-			let rt = self.relations.get(adj_in[0], *i).unwrap();
+			let rt = self.relations.get(adj_in[0], *entity).unwrap();
 			let mut min = self.entites[adj_in[0]].level;
 			for j in adj_in.iter() {
 				let l = self.entites[*j].level;
@@ -134,16 +136,20 @@ impl Mythos {
 			};
 
 			let new_level = min + inc;
-			let delta = new_level - self.entites[*i].level;
+			if new_level - self.entites[*entity].level == 0 { continue; }
 
-			trace!("rt: {:?}", rt);
-			trace!("min: {}, inc: {}, l': {}, delta: {}", min, inc, new_level, delta);
-			if delta == 0 { continue; }
-
-			self.entites[*i].level = new_level;
+			self.entites[*entity].level = new_level;
 		}
 	}
 
+	/* Generate the entity's domains following this rules:
+	 * - A created or successfully invoked entity must have the average of the
+	 *   creators domains
+	 * - A children entity must be the cross_over of the parents
+	 * - A failed invoked entity must have generated domain
+	 * - All domains must be mutated
+	 *
+	 */
 	fn generate_domains(&mut self) {
 		use rand::Rng;
 		use relations::RelationType;
@@ -155,6 +161,7 @@ impl Mythos {
 			self.entites[*i].domain = domains::Domain::gen_domain();
 		}
 
+		// TODO: Usar ordem topologica
 		for i in 0..self.entites.len() {
 			let adj_in = self.relations.get_adj_in(i);
 			if adj_in.is_empty() { continue; }
