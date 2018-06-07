@@ -62,7 +62,8 @@ fn entity_description(mythos: &Mythos, e: usize) -> String {
 		let rt = mythos.relations.get(adj_in[0], e).unwrap();
 
 		s += match rt {
-			RelationType::Invoker => " invoked by",
+			RelationType::Invoker(true) => " invoked by",
+			RelationType::Invoker(false) => " failed invoked by",
 			RelationType::Creator => " created by",
 			RelationType::Parent => " children of",
 			_ => "",

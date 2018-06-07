@@ -34,18 +34,25 @@ pub fn relations_to_dot(mythos: &Mythos) -> String {
 	let get_color = |rt: &RelationType| -> &str {
 		match rt {
 			&RelationType::Base => "#909090",
-			&RelationType::Invoker => "#ea51b2",
+			&RelationType::Invoker(_) => "#ea51b2",
 			&RelationType::Creator => "#00f769",
 			&RelationType::Parent => "#62d6e8",
 		}
 	};
 
 	let relation_to_dot = |i: usize, j: usize, rt: &RelationType| -> String {
+		let shape = match rt {
+			&RelationType::Invoker(true) => " arrowhead=\"veedot\"",
+			&RelationType::Invoker(false) => " arrowhead=\"veeodot\"",
+			_ => "",
+		};
+
 		format!(
-			"{} -> {} [color=\"{}\"]",
+			"{} -> {} [color=\"{}\"{}]",
 			mythos.entites[i].name,
 			mythos.entites[j].name,
 			get_color(rt),
+			shape,
 		)
 	};
 

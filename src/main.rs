@@ -128,7 +128,7 @@ impl Mythos {
 			}
 
 			let inc = match rt {
-				RelationType::Invoker => -1,
+				RelationType::Invoker(_) => -1,
 				RelationType::Creator => 1,
 				_ => 0,
 			};
@@ -191,7 +191,7 @@ impl Mythos {
 
 				self.entites[i].domain = Domain::gen_from_average(ds).mutate();
 
-			} else if rt == RelationType::Invoker {
+			} else if rt == RelationType::Invoker(true) {
 				debug!("I found a Invoker type");
 
 				if rand::thread_rng().gen_bool(0.7) {
@@ -204,6 +204,9 @@ impl Mythos {
 				} else {
 					debug!("The invokation failed");
 
+					for j in adj_in.iter() {
+						self.relations.add(*j, i, RelationType::Invoker(false));
+					}
 					self.entites[i].domain = Domain::gen_domain().mutate();
 				}
 			}

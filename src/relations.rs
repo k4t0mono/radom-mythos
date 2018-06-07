@@ -8,7 +8,7 @@ use rand::Rng;
 pub enum RelationType {
 	Base,
 	Parent,
-	Invoker,
+	Invoker(bool),
 	Creator,
 }
 
@@ -33,6 +33,10 @@ impl Relations {
 	pub fn generate(&mut self) {
 		self.generate_base_relation();
 		self.generate_relations();
+	}
+
+	pub fn add(&mut self, i: usize, j: usize, rt: RelationType) {
+		self.data[i][j] = Some(rt);
 	}
 
 	pub fn get(&self, i: usize, j: usize) -> Option<RelationType> {
@@ -183,7 +187,7 @@ impl Relations {
 
 			let rt: RelationType = match rt_n {
 				0 => RelationType::Parent,
-				1 => RelationType::Invoker,
+				1 => RelationType::Invoker(true),
 				2 => RelationType::Creator,
 				
 				_ => panic!("Help"),
