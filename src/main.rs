@@ -1,5 +1,4 @@
 // An attempt to make a procedural Mythos generator
-#![allow(dead_code)]
 #[macro_use]
 extern crate log;
 extern crate simplelog;
@@ -18,6 +17,7 @@ use docopt::Docopt;
 
 mod relations;
 mod domains;
+mod plains;
 
 mod dot;
 mod description;
@@ -119,7 +119,7 @@ impl Mythos {
 		for entity in entites.iter() {
 			trace!("fixing {}", *entity);
 			let adj_in = self.relations.get_adj_in(*entity);
-			trace!("adj_in: {}", adj_in);
+			trace!("adj_in: {:?}", adj_in);
 			if adj_in.is_empty() { continue; }
 
 			let rt = self.relations.get(adj_in[0], *entity).unwrap();
@@ -158,11 +158,10 @@ impl Mythos {
 		info!("Generate domains");
 
 		for i in self.relations.get_roots().iter() {
-			self.entites[*i].domain = domains::Domain::gen_domain();
+			self.entites[*i].domain = Domain::gen_domain();
 		}
 
-		// TODO: Usar ordem topologica
-		for i in 0..self.entites.len() {
+		for &i in self.relations.get_topological_sort().iter() {
 			let adj_in = self.relations.get_adj_in(i);
 			if adj_in.is_empty() { continue; }
 			debug!("Trying {}", i);
@@ -172,23 +171,11 @@ impl Mythos {
 			if rt == RelationType::Parent {
 				trace!("I found a Parent type");
 
-				if adj_in.len() == 1 {
-					debug!("I'm children of a single");
+				let mut domains: Vec<Domain> = vec![];
+				for &j in adj_in.iter() { domains.push(self.entites[j].domain.clone()); }
 
-					self.entites[i].domain = self.entites[adj_in[0]].domain.mutate();
-
-				} else {
-					debug!("I have many parents");
-
-					let mut d = self.entites[adj_in[0]].domain.clone();
-					for j in 1..adj_in.len() {
-						trace!("cross_over {}", j);
-
-						d = d.cross_over(&self.entites[adj_in[j]].domain).mutate();
-					}
-
-					self.entites[i].domain = d;
-				}
+				self.entites[i].domain = Domain::cross_over_many(&domains);
+				self.entites[i].domain.mutate();
 
 			} else if rt == RelationType::Creator {
 				debug!("I found a Creator type");

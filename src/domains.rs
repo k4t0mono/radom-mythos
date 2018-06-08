@@ -132,12 +132,12 @@ impl Domain {
 		d
 	}
 
-	pub fn cross_over(&self, d2: &Domain) -> Domain {
+	pub fn cross_over(d1: &Domain, d2: &Domain) -> Domain {
 		debug!("Cross_over");
 		let mut d_new = Domain::new();
 
-		for (k, v) in &self.values {
-			let n = (v & 0xf0) | (d2.values.get(k).unwrap() & 0x0f);
+		for (k, v) in d1.values.iter() {
+			let n = (v & 0xf0) | (d2.values.get(&k).unwrap() & 0x0f);
 			trace!("new {:?}: {:?}", k, n);
 
 			d_new.values.insert(*k, n);
@@ -146,6 +146,17 @@ impl Domain {
 		d_new.set_primary_secundary();
 
 		d_new
+	}
+
+	pub fn cross_over_many(domains: &Vec<Domain>) -> Domain {
+		debug!("Cross-over many");
+		let mut new_d = domains[0].clone();
+
+		for i in 1..domains.len() {
+			new_d = Domain::cross_over(&new_d, &domains[i]);
+		}
+
+		new_d
 	}
 
 	fn find_primary_secundary(&self) -> (DomainType, DomainType) {
